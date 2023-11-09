@@ -97,7 +97,7 @@ def make_results(outputs, targets, postprocessors, tracking, return_only_orig=Tr
 
     return results_orig, results
 
-
+# train.py training part leads to here.
 def train_one_epoch(model: torch.nn.Module, criterion: torch.nn.Module, postprocessors,
                     data_loader: Iterable, optimizer: torch.optim.Optimizer,
                     device: torch.device, epoch: int, visualizers: dict, args):
@@ -125,9 +125,9 @@ def train_one_epoch(model: torch.nn.Module, criterion: torch.nn.Module, postproc
         # passes copies
         outputs, targets, *_ = model(samples, targets)
 
-        loss_dict = criterion(outputs, targets)
-        weight_dict = criterion.weight_dict
-        losses = sum(loss_dict[k] * weight_dict[k] for k in loss_dict.keys() if k in weight_dict)
+        loss_dict = criterion(outputs, targets)  # loss criterion(custom class(inherited by nn.Module)) defined in DETR
+        weight_dict = criterion.weight_dict  # weight_dict item indicates 3 types of loss "types"' weight(ce, bbox, giou.)
+        losses = sum(loss_dict[k] * weight_dict[k] for k in loss_dict.keys() if k in weight_dict)  # 
 
         # reduce losses over all GPUs for logging purposes
         loss_dict_reduced = utils.reduce_dict(loss_dict)

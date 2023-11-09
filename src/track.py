@@ -18,10 +18,12 @@ from trackformer.models.tracker import Tracker
 from trackformer.util.misc import nested_dict_to_namespace
 from trackformer.util.track_utils import (evaluate_mot_accums, get_mot_accum,
                                           interpolate_tracks, plot_sequence)
+import time
 
+start = time.time()
 mm.lap.default_solver = 'lap'
 
-ex = sacred.Experiment('track')
+ex = sacred.Experiment('track', save_git_info=False)
 ex.add_config('cfgs/track.yaml')
 ex.add_named_config('reid', 'cfgs/track_reid.yaml')
 
@@ -203,3 +205,7 @@ def main(seed, dataset_name, obj_detect_checkpoint_file, tracker_cfg,
         return summary
 
     return mot_accums
+
+end = time.time()
+dur = end - start
+print(dur)

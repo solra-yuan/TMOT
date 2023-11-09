@@ -403,7 +403,7 @@ class SetCriterion(nn.Module):
         # Compute all the requested losses
         losses = {}
         for loss in self.losses:
-            losses.update(self.get_loss(loss, outputs, targets, indices, num_boxes))
+            losses.update(self.get_loss(loss, outputs, targets, indices, num_boxes))  # refer to get_loss
 
         # In case of auxiliary losses, we repeat this process with the
         # output of each intermediate layer.

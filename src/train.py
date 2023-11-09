@@ -20,19 +20,35 @@ from trackformer.util.misc import nested_dict_to_namespace
 from trackformer.util.plot_utils import get_vis_win_names
 from trackformer.vis import build_visualizers
 
+# 실험 환경설정 변수 제어. sacred(실험 reproducing 제어) init, 
+# 커맨드라인 입력 처리(데이터셋, 모델 동작 제어 옵션ㅡdeformable, tracking, multiframe, full resolution 등) 
 ex = sacred.Experiment('train')
 ex.add_config('cfgs/train.yaml')
-ex.add_named_config('deformable', 'cfgs/train_deformable.yaml')
-ex.add_named_config('tracking', 'cfgs/train_tracking.yaml')
+ex.add_named_config('deformable', 'cfgs/train_deformable.yaml') #
+ex.add_named_config('tracking', 'cfgs/train_tracking.yaml') #
 ex.add_named_config('crowdhuman', 'cfgs/train_crowdhuman.yaml')
 ex.add_named_config('mot_coco_person', 'cfgs/train_mot_coco_person.yaml')
 ex.add_named_config('mot17_crowdhuman', 'cfgs/train_mot17_crowdhuman.yaml')
-ex.add_named_config('mot17', 'cfgs/train_mot17.yaml')
+ex.add_named_config('mot17', 'cfgs/train_mot17.yaml') #
 ex.add_named_config('mots20', 'cfgs/train_mots20.yaml')
 ex.add_named_config('mot20_crowdhuman', 'cfgs/train_mot20_crowdhuman.yaml')
 ex.add_named_config('coco_person_masks', 'cfgs/train_coco_person_masks.yaml')
 ex.add_named_config('full_res', 'cfgs/train_full_res.yaml')
-ex.add_named_config('multi_frame', 'cfgs/train_multi_frame.yaml')
+ex.add_named_config('multi_frame', 'cfgs/train_multi_frame.yaml') #
+ex.add_named_config('flir_adas_v2', 'cfgs/train_flir_adas_v2_mot17_copy.yaml') # add custom config
+ex.add_named_config('flir_adas_v2_crowdhuman','cfgs/train_mot17_crowdhuman.yaml') 
+# python src/train.py with \
+#     mot17 \
+#     deformable \
+#     multi_frame \
+#     tracking \
+#     resume=models/mot17_crowdhuman_deformable_trackformer/checkpoint_epoch_40.pth \
+#     output_dir=models/custom_dataset_deformable \
+#     mot_path_train=data/custom_dataset \
+#     mot_path_val=data/custom_dataset \
+#     train_split=train \
+#     val_split=val \
+#     epochs=20 \
 
 
 def train(args: Namespace) -> None:

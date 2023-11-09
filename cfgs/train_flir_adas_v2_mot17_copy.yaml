@@ -1,0 +1,14 @@
+# copy of train_mot17
+
+dataset: flir_adas_v2
+
+train_split: flir_adas_v2_train_coco
+val_split: flir_adas_v2_train_cross_val_frame_0_5_to_1_0_coco
+
+mot_path_train: data/flir_adas_v2_coco
+mot_path_val: data/flir_adas_v2_coco
+
+resume: models/r50_deformable_detr_plus_iterative_bbox_refinement-checkpoint_hidden_dim_288.pth
+
+epochs: 50
+lr_drop: 10

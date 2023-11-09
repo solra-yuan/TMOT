@@ -12,7 +12,7 @@ from .detr_tracking import DeformableDETRTracking, DETRTracking
 from .matcher import build_matcher
 from .transformer import build_transformer
 
-
+# train_one_epoch loss_dict criterion.weight_dict leads to here
 def build_model(args):
     if args.dataset == 'coco':
         num_classes = 91
@@ -22,6 +22,8 @@ def build_model(args):
         # num_classes = 91
         num_classes = 20
         # num_classes = 1
+    elif args.dataset in ['flir_adas_v2', 'flir_adas_v2_crowdhuman']:
+        num_classes = 10
     else:
         raise NotImplementedError
 
@@ -81,10 +83,10 @@ def build_model(args):
                 model = DETRSegm(mask_kwargs, detr_kwargs)
             else:
                 model = DETR(**detr_kwargs)
-
+    
     weight_dict = {'loss_ce': args.cls_loss_coef,
                    'loss_bbox': args.bbox_loss_coef,
-                   'loss_giou': args.giou_loss_coef,}
+                   'loss_giou': args.giou_loss_coef,}      # weight_dict leads to 3 types of losses : ce, bbox, giou
 
     if args.masks:
         weight_dict["loss_mask"] = args.mask_loss_coef
@@ -100,9 +102,9 @@ def build_model(args):
             aux_weight_dict.update({k + f'_enc': v for k, v in weight_dict.items()})
         weight_dict.update(aux_weight_dict)
 
-    losses = ['labels', 'boxes', 'cardinality']
+    losses = ['labels', 'boxes', 'cardinality']  # criterion's self.losses leads here -> 3 sort of losses to define criterion
     if args.masks:
-        losses.append('masks')
+        losses.append('masks')  # 4 sort of losses, additional masks loss to 3 sort of default losses, if in case of "masks" flag.
 
     criterion = SetCriterion(
         num_classes,
@@ -114,7 +116,7 @@ def build_model(args):
         focal_alpha=args.focal_alpha,
         focal_gamma=args.focal_gamma,
         tracking=args.tracking,
-        track_query_false_positive_eos_weight=args.track_query_false_positive_eos_weight,)
+        track_query_false_positive_eos_weight=args.track_query_false_positive_eos_weight,) 
     criterion.to(device)
 
     if args.focal_loss:

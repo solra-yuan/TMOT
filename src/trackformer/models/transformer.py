@@ -228,6 +228,7 @@ class TransformerDecoderLayer(nn.Module):
     def __init__(self, d_model, nhead, dim_feedforward=2048, dropout=0.1,
                  activation="relu", normalize_before=False):
         super().__init__()
+        # 2 mul_head_attention, linear layers, dropout, layer nomralizations
         self.self_attn = nn.MultiheadAttention(d_model, nhead, dropout=dropout)
         self.multihead_attn = nn.MultiheadAttention(d_model, nhead, dropout=dropout)
         # Implementation of Feedforward model
@@ -255,7 +256,7 @@ class TransformerDecoderLayer(nn.Module):
                      memory_key_padding_mask: Optional[Tensor] = None,
                      pos: Optional[Tensor] = None,
                      query_pos: Optional[Tensor] = None):
-        q = k = self.with_pos_embed(tgt, query_pos)
+        q = k = self.with_pos_embed(tgt, query_pos)  # no normalization before attention(applied only after residual connection).
         tgt2 = self.self_attn(q, k, value=tgt, attn_mask=tgt_mask,
                               key_padding_mask=tgt_key_padding_mask)[0]
         tgt = tgt + self.dropout1(tgt2)
@@ -279,19 +280,19 @@ class TransformerDecoderLayer(nn.Module):
                     pos: Optional[Tensor] = None,
                     query_pos: Optional[Tensor] = None):
         tgt2 = self.norm1(tgt)
-        q = k = self.with_pos_embed(tgt2, query_pos)
+        q = k = self.with_pos_embed(tgt2, query_pos)  # query = key,  positional embedding
         tgt2 = self.self_attn(q, k, value=tgt2, attn_mask=tgt_mask,
-                              key_padding_mask=tgt_key_padding_mask)[0]
-        tgt = tgt + self.dropout1(tgt2)
+                              key_padding_mask=tgt_key_padding_mask)[0]  
+        tgt = tgt + self.dropout1(tgt2)  # drp_out( mul_head_attention(pos_emb(norm(t)), pos_emb(norm(t))) ) + t  => residual connection
         tgt2 = self.norm2(tgt)
         tgt2 = self.multihead_attn(query=self.with_pos_embed(tgt2, query_pos),
                                    key=self.with_pos_embed(memory, pos),
                                    value=memory, attn_mask=memory_mask,
-                                   key_padding_mask=memory_key_padding_mask)[0]
-        tgt = tgt + self.dropout2(tgt2)
-        tgt2 = self.norm3(tgt)
-        tgt2 = self.linear2(self.dropout(self.activation(self.linear1(tgt2))))
-        tgt = tgt + self.dropout3(tgt2)
+                                   key_padding_mask=memory_key_padding_mask)[0]  # mul_head_attention(pos_emb(norm(out_1)), pos_emb(memory))
+        tgt = tgt + self.dropout2(tgt2)  # residual connection
+        tgt2 = self.norm3(tgt)  # drp_out( mul_head_attention(pos_emb(t)))
+        tgt2 = self.linear2(self.dropout(self.activation(self.linear1(tgt2))))  # fc layers
+        tgt = tgt + self.dropout3(tgt2)  # residual connection
         return tgt
 
     def forward(self, tgt, memory,

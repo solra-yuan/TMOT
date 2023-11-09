@@ -89,8 +89,7 @@ class DeformableDETR(DETR):
             nn.init.xavier_uniform_(proj[0].weight, gain=1)
             nn.init.constant_(proj[0].bias, 0)
 
-        # if two-stage, the last class_embed and bbox_embed is for
-        # region proposal generation
+        # if two-stage, the last class_embed and bbox_embed is for region proposal generation
         num_pred = transformer.decoder.num_layers
         if two_stage:
             num_pred += 1

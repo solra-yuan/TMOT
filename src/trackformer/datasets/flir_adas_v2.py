@@ -17,10 +17,10 @@ from .coco import build as build_coco
 from .crowdhuman import build_crowdhuman
 
 
-class MOT(CocoDetection):
+class FLIR_ADAS_V2(CocoDetection):
 
     def __init__(self, *args, prev_frame_range=1, **kwargs):
-        super(MOT, self).__init__(*args, **kwargs)
+        super(FLIR_ADAS_V2, self).__init__(*args, **kwargs)
 
         self._prev_frame_range = prev_frame_range
 
@@ -126,7 +126,7 @@ class WeightedConcatDataset(torch.utils.data.ConcatDataset):
             return 1 / len(self.datasets[dataset_idx])
 
 
-def build_mot(image_set, args):
+def build_flir_adas_v2(image_set, args):
     if image_set == 'train':
         root = Path(args.mot_path_train)
         prev_frame_rnd_augs = args.track_prev_frame_rnd_augs
@@ -138,7 +138,7 @@ def build_mot(image_set, args):
     else:
         ValueError(f'unknown {image_set}')
 
-    assert root.exists(), f'provided MOT17Det path {root} does not exist'
+    assert root.exists(), f'provided flir_adas_v2 Det path {root} does not exist'
 
     split = getattr(args, f"{image_set}_split")
 
@@ -148,7 +148,7 @@ def build_mot(image_set, args):
     transforms, norm_transforms = make_coco_transforms(
         image_set, args.img_transform, args.overflow_boxes)
 
-    dataset = MOT(
+    dataset = FLIR_ADAS_V2(
         img_folder, ann_file, transforms, norm_transforms,
         prev_frame_range=prev_frame_range,
         return_masks=args.masks,
@@ -162,7 +162,7 @@ def build_mot(image_set, args):
     return dataset
 
 
-def build_mot_crowdhuman(image_set, args):
+def build_flir_adas_v2_crowdhuman(image_set, args):
     if image_set == 'train':
         args_crowdhuman = copy.deepcopy(args)
         args_crowdhuman.train_split = args.crowdhuman_train_split
@@ -172,29 +172,10 @@ def build_mot_crowdhuman(image_set, args):
         if getattr(args, f"{image_set}_split") is None:
             return crowdhuman_dataset
 
-    dataset = build_mot(image_set, args)
+    dataset = build_flir_adas_v2(image_set, args)
 
     if image_set == 'train':
         dataset = torch.utils.data.ConcatDataset(
             [dataset, crowdhuman_dataset])
-
-    return dataset
-
-
-def build_mot_coco_person(image_set, args):
-    if image_set == 'train':
-        args_coco_person = copy.deepcopy(args)
-        args_coco_person.train_split = args.coco_person_train_split
-
-        coco_person_dataset = build_coco('train', args_coco_person, 'person_keypoints')
-
-        if getattr(args, f"{image_set}_split") is None:
-            return coco_person_dataset
-
-    dataset = build_mot(image_set, args)
-
-    if image_set == 'train':
-        dataset = torch.utils.data.ConcatDataset(
-            [dataset, coco_person_dataset])
 
     return dataset
