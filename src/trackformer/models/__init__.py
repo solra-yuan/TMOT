@@ -23,7 +23,7 @@ def build_model(args):
         num_classes = 20
         # num_classes = 1
     elif args.dataset in ['flir_adas_v2', 'flir_adas_v2_crowdhuman']:
-        num_classes = 10
+        num_classes = 20 ## okay. why 20? this is not related to category #. 
     else:
         raise NotImplementedError
 

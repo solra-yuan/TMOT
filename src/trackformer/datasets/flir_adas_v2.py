@@ -36,7 +36,7 @@ class FLIR_ADAS_V2(CocoDetection):
             return {'start': 0, 'end': 1.0}
 
     def seq_length(self, idx):
-        return self.coco.imgs[idx][' _length']
+        return self.coco.imgs[idx]['seq_length']
 
     def sample_weight(self, idx):
         return 1.0 / self.seq_length(idx)
@@ -128,11 +128,11 @@ class WeightedConcatDataset(torch.utils.data.ConcatDataset):
 
 def build_flir_adas_v2(image_set, args):
     if image_set == 'train':
-        root = Path(args.mot_path_train)
+        root = Path(args.flir_adas_v2_path_train)
         prev_frame_rnd_augs = args.track_prev_frame_rnd_augs
         prev_frame_range=args.track_prev_frame_range
     elif image_set == 'val':
-        root = Path(args.mot_path_val)
+        root = Path(args.flir_adas_v2_path_val)
         prev_frame_rnd_augs = 0.0
         prev_frame_range = 1
     else:
@@ -163,19 +163,4 @@ def build_flir_adas_v2(image_set, args):
 
 
 def build_flir_adas_v2_crowdhuman(image_set, args):
-    if image_set == 'train':
-        args_crowdhuman = copy.deepcopy(args)
-        args_crowdhuman.train_split = args.crowdhuman_train_split
-
-        crowdhuman_dataset = build_crowdhuman('train', args_crowdhuman)
-
-        if getattr(args, f"{image_set}_split") is None:
-            return crowdhuman_dataset
-
-    dataset = build_flir_adas_v2(image_set, args)
-
-    if image_set == 'train':
-        dataset = torch.utils.data.ConcatDataset(
-            [dataset, crowdhuman_dataset])
-
-    return dataset
+    pass

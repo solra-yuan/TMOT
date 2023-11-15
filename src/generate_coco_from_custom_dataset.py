@@ -18,26 +18,47 @@ from pycocotools.coco import COCO
 from scipy.optimize import linear_sum_assignment
 from torchvision.ops.boxes import box_iou
 
-CUSTOM_ROOT = '/app/object_detection/data/flir_adas_v2_orig/video_rgb_test'
-TARGET_ROOT = '/app/object_detection/trackformer/data/flir_adas_v2_coco'
-VIS_THRESHOLD = 0.25 ## 
+FLIR_ADAS_V2 = True
+FLIR_ADAS_V2_ROOT = '/app/data/flir_adas_v2_orig/video_rgb_test/data'
+CUSTOM_ROOT = None
+
+TARGET_ROOT = '/app/TMOT/data/flir_adas_v2'
+
 
 FLIR_ADAS_V2_SEQS_INFO = {}
+SEQS_INFO = {}
 
+VIS_THRESHOLD = 0.25 ## 
 
 
 # dataset preview
 if __name__ == '__main__':
-    vidnames = sorted(os.listdir(os.path.join(CUSTOM_ROOT, 'data')))
+
+    DATA_ROOT = CUSTOM_ROOT
+    if FLIR_ADAS_V2:
+        DATA_ROOT = os.path.join(FLIR_ADAS_V2_ROOT)
+
+    vidnames = sorted(os.listdir(DATA_ROOT))
+    
     seqs = {v[:23]:None for v in vidnames}
     print("seqlen", len(seqs), seqs)
+    '''
+    {'video-BzZspxAweF8AnKhWK': None, 
+    'video-FkqCGijjAKpABetZZ': None, 
+    'video-PGdt7pJChnKoJDt35': None, 
+    'video-RMxN6a4CcCeLGu4tA': None, 
+    'video-YnfPeH8i2uBWmsSd2': None, 
+    'video-dvZBYnphN2BwdMKBc': None, 
+    'video-hnbGXq3nNPjBbc7CL': None, 
+    'video-msNEBxJE5PPDqenBM': None}
+    '''
 
     for seq in seqs:
         # check sequence length
         seqlist = [name for name in vidnames if seq in name]
         print("seqname: ", seq, "length: ", len(seqlist))
 
-        seq_first_im = plt.imread(os.path.join(CUSTOM_ROOT, 'data', seqlist[0]))
+        seq_first_im = plt.imread(os.path.join(DATA_ROOT, seqlist[0]))
         seq_first_im_shape = seq_first_im.shape
         # data size check
         # for img_name in seqlist:
@@ -45,16 +66,34 @@ if __name__ == '__main__':
         #     if im.shape != seq_first_im_shape:
         #         print(im.shape)  ## raise assertionerror
         #     # check
-        FLIR_ADAS_V2_SEQS_INFO[seq] = {'img_width': seq_first_im_shape[0],
-                                       'img_height': seq_first_im_shape[1],
-                                       'seq_length': len(seqlist)}
-        
-print(FLIR_ADAS_V2_SEQS_INFO)
+        if FLIR_ADAS_V2:
+            FLIR_ADAS_V2_SEQS_INFO[seq] = {'img_width': seq_first_im_shape[0],
+                                        'img_height': seq_first_im_shape[1],
+                                        'seq_length': len(seqlist)}
+        else:
+            SEQS_INFO[seq] = {'img_width': seq_first_im_shape[0],
+                                        'img_height': seq_first_im_shape[1],
+                                        'seq_length': len(seqlist)}
+    if FLIR_ADAS_V2:
+        SEQS_INFO = FLIR_ADAS_V2_SEQS_INFO
+
+    print(SEQS_INFO)
+    """
+    {'video-BzZspxAweF8AnKhWK': {'img_width': 1024, 'img_height': 1224, 'seq_length': 338}, 
+    'video-FkqCGijjAKpABetZZ': {'img_width': 1024, 'img_height': 1224, 'seq_length': 226}, 
+    'video-PGdt7pJChnKoJDt35': {'img_width': 1024, 'img_height': 1224, 'seq_length': 208}, 
+    'video-RMxN6a4CcCeLGu4tA': {'img_width': 768, 'img_height': 1024, 'seq_length': 1033}, 
+    'video-YnfPeH8i2uBWmsSd2': {'img_width': 1024, 'img_height': 1224, 'seq_length': 540}, 
+    'video-dvZBYnphN2BwdMKBc': {'img_width': 768, 'img_height': 1024, 'seq_length': 565}, 
+    'video-hnbGXq3nNPjBbc7CL': {'img_width': 1024, 'img_height': 1224, 'seq_length': 411}, 
+    'video-msNEBxJE5PPDqenBM': {'img_width': 1024, 'img_height': 1224, 'seq_length': 428}}
+    """
+    print()
 # vidseq_to_names = {}
 # video-5tYghHhFktjq4nQ5R-frame-001685-4kSNcWCSXX6FZyiZz
 # video-5zpwfwcv9hXTFxw8m-frame-003207-EJa2An8JwK5o58BHh
 
-def generate_coco_from_custom(split_name='train', seqs_names=None,
+def generate_coco_from_custom(split_name='train_coco', seqs_names=None,
                               root_split='train', flir_adas_v2=False, 
                               frame_range=None, 
                               data_root='data/flir_adas_v2',
@@ -66,19 +105,23 @@ def generate_coco_from_custom(split_name='train', seqs_names=None,
     if frame_range is None:
         frame_range = {'start': 0.0, 'end': 1.0}
 
-    # todo : check root setting ; target and original root
     if flir_adas_v2:
-        data_root = TARGET_ROOT    
+        CUSTOM_ROOT = FLIR_ADAS_V2_ROOT
+        # CUSTOM_ROOT = os.path.join(FLIR_ADAS_V2_ROOT, root_split) # if root_split same to split_name.
 
-    # original customdata root
-    root_split_custom_path = os.path.join(CUSTOM_ROOT, 'data')
-    # target customdata root
-    root_split_path = os.path.join(CUSTOM_ROOT, 'data') 
-    coco_dir = os.path.join(data_root, split_name)    #target root?
+    # original custom data root
+    root_split_path = os.path.join(CUSTOM_ROOT) 
+
+    # target custom data root
+    coco_dir = os.path.join(data_root, split_name)    #target root
+    print("target dir", coco_dir)
+    if os.path.isdir(coco_dir):
+        shutil.rmtree(coco_dir)
     os.makedirs(coco_dir, exist_ok=True)
 
+    
 
-    #
+    # make annotations
     annotations = {}
     annotations['type'] = 'instances'
     annotations['images'] = []
@@ -137,20 +180,22 @@ def generate_coco_from_custom(split_name='train', seqs_names=None,
     img_id = 0
 
     # load img sequences(sorted) list
-    full_seqs = sorted(os.listdir(root_split_custom_path))
+    full_seqs = sorted(os.listdir(root_split_path))
     seqs = sorted(list({se[:23] for se in full_seqs}))
     if seqs_names is not None:
-        seqs = [s for s in seqs if s in full_seqs]
+        seqs = [s for s in seqs if s in seqs_names]
 
     annotations['sequences'] = seqs
     annotations['frame_range'] = frame_range
+
+    print("in this split, these sequences are included:")
     print(split_name, len(seqs))
     
     for seq in seqs:
 
-        img_width = FLIR_ADAS_V2_SEQS_INFO[seq]['img_width']
-        img_height = FLIR_ADAS_V2_SEQS_INFO[seq]['img_height']
-        seq_length = FLIR_ADAS_V2_SEQS_INFO[seq]['seq_length']
+        img_width = SEQS_INFO[seq]['img_width']
+        img_height = SEQS_INFO[seq]['img_height']
+        seq_length = SEQS_INFO[seq]['seq_length']
 
         # custom datasets where
         # all image sequences is collected in one directories.
@@ -184,6 +229,10 @@ def generate_coco_from_custom(split_name='train', seqs_names=None,
             # seq_length : (sequence length) * (frame range ratio(0~1))
             # first_frame_image_id : image id of each sequence's first image
             img_id += 1
+
+            # make symbolic link of original files
+            os.symlink(os.path.join(root_split_path, img),
+                       os.path.join(coco_dir, f"{img}")) # img file name is preserved.
     
     # GT
     annotation_id = 0
@@ -197,10 +246,10 @@ def generate_coco_from_custom(split_name='train', seqs_names=None,
 
     # for seq in seqs:   ## sequence 개수만큼 처리하고 있다. ㅇㅅㅇ.... 이 루프는 필요없다. 그래서 시퀀스 개수만큼 저장하는 건가?
     # GT FILE
-    gt_file_path = os.path.join(Path(root_split_custom_path).parents[0], 'coco.json')
+    gt_file_path = os.path.join(Path(root_split_path).parents[0], 'coco.json')  # gt_file_path: CUSTOM file이 COCO 양식이면 COCO.json 위치
     if flir_adas_v2:
         gt_file_path = os.path.join(
-            Path(root_split_custom_path).parents[0],'coco.json'
+            Path(root_split_path).parents[0],'coco.json'
         )
 
     nan_track_id_count = 0
@@ -211,6 +260,7 @@ def generate_coco_from_custom(split_name='train', seqs_names=None,
     # 시퀀스별로 저장이야?
 
     seq_annotations = []
+    
     if flir_adas_v2:
         with open(gt_file_path, "r") as gt_file:
             annot_json_data = json.load(gt_file)
@@ -224,22 +274,26 @@ def generate_coco_from_custom(split_name='train', seqs_names=None,
             if flag1:
                 print("annot", annot)
                 flag1 = False
+            image_seq = image_id_to_image_seq.get(annot['image_id'], None)
+            if image_seq is None:
+                continue
             annotation = {
                 "id": annotation_id,
                 "bbox": annot['bbox'],
                 "image_id": annot['image_id'],
                 "segmentation": annot['segmentation'],
-                "ignore": False if annot['category_id'] else False,
+                "ignore": 0 if annot['category_id'] else 1, 
                 "visibility": 1.0,
                 "area": annot['area'],
-                "iscrowd": annot['iscrowd'],
-                "seq": image_id_to_image_seq[annot['image_id']],
-                "category_id": coco_orig_category_id_to_sorted_order_dict[annot['category_id']],
-                "track_id": annot['track_id'] if 'track_id' in annot else -1
+                "iscrowd": 1 if annot['iscrowd'] else 0,
+                "seq": image_seq,
+                "category_id": coco_orig_category_id_to_sorted_order_dict[annot['category_id']],  
+                "track_id": annot['track_id']+1 if 'track_id' in annot else -1  # track_id는 1부터 시작함
                 }
             if annotation['track_id'] == -1:
                 nan_track_id_count += 1
                 print("track id is nan!", nan_track_id_count)
+                print("annotation", annotation['track_id'])
 
             # {
             #   "annotations": [{"area": 4095, "bbox": [495, 441, 91, 45],
@@ -255,6 +309,9 @@ def generate_coco_from_custom(split_name='train', seqs_names=None,
         print('nan track id count', nan_track_id_count)
         
         annotations['annotations'].extend(seq_annotations)
+    else:
+        # TODO : flir_adas_v2가 아닐 때(CUSTOM) parsing    
+        pass
         
         
     # max objs per image
@@ -275,8 +332,32 @@ def generate_coco_from_custom(split_name='train', seqs_names=None,
         json.dump(annotations, anno_file, indent=4)
     
 if __name__ == '__main__':
-    generate_coco_from_custom(split_name='train', seqs_names=None,
+    """
+    {'video-BzZspxAweF8AnKhWK': {'img_width': 1024, 'img_height': 1224, 'seq_length': 338}, 
+    'video-FkqCGijjAKpABetZZ': {'img_width': 1024, 'img_height': 1224, 'seq_length': 226}, 
+    'video-PGdt7pJChnKoJDt35': {'img_width': 1024, 'img_height': 1224, 'seq_length': 208}, 
+    'video-RMxN6a4CcCeLGu4tA': {'img_width': 768, 'img_height': 1024, 'seq_length': 1033}, 
+    'video-YnfPeH8i2uBWmsSd2': {'img_width': 1024, 'img_height': 1224, 'seq_length': 540}, 
+    'video-dvZBYnphN2BwdMKBc': {'img_width': 768, 'img_height': 1024, 'seq_length': 565}, 
+    'video-hnbGXq3nNPjBbc7CL': {'img_width': 1024, 'img_height': 1224, 'seq_length': 411}, 
+    'video-msNEBxJE5PPDqenBM': {'img_width': 1024, 'img_height': 1224, 'seq_length': 428}}
+    """
+    trainseq = ['video-BzZspxAweF8AnKhWK', 'video-FkqCGijjAKpABetZZ', 'video-PGdt7pJChnKoJDt35',
+                'video-RMxN6a4CcCeLGu4tA', 'video-YnfPeH8i2uBWmsSd2']
+    valseq = ['video-dvZBYnphN2BwdMKBc', 'video-hnbGXq3nNPjBbc7CL']
+    testseq = ['video-msNEBxJE5PPDqenBM']
+    generate_coco_from_custom(split_name='train_coco', seqs_names=trainseq,
                               root_split='train', flir_adas_v2=True, 
                               frame_range=None, 
-                              data_root='data/flir_adas_v2',
+                              data_root=TARGET_ROOT,
+                              )
+    generate_coco_from_custom(split_name='val_coco', seqs_names=valseq,
+                              root_split='train', flir_adas_v2=True, 
+                              frame_range=None, 
+                              data_root=TARGET_ROOT,
+                              )
+    generate_coco_from_custom(split_name='test_coco', seqs_names=testseq,
+                              root_split='train', flir_adas_v2=True, 
+                              frame_range=None, 
+                              data_root=TARGET_ROOT,
                               )

@@ -36,7 +36,7 @@ class MOT(CocoDetection):
             return {'start': 0, 'end': 1.0}
 
     def seq_length(self, idx):
-        return self.coco.imgs[idx][' _length']
+        return self.coco.imgs[idx]['seq_length']
 
     def sample_weight(self, idx):
         return 1.0 / self.seq_length(idx)

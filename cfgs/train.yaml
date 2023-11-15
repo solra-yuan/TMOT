@@ -136,3 +136,6 @@ vis_server: ''
 vis_port: 8090
 vis_and_log_interval: 50
 no_vis: false
+
+flir_adas_v2_path_train: data/flir_adas_v2
+flir_adas_v2_path_val: data/flir_adas_v2

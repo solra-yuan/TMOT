@@ -51,6 +51,37 @@ ex.add_named_config('flir_adas_v2_crowdhuman','cfgs/train_mot17_crowdhuman.yaml'
 #     epochs=20 \
 
 
+
+
+# python src/train.py with \
+#     mot17 \
+#     deformable \
+#     multi_frame \
+#     tracking \
+#     output_dir=models/mot17_crowdhuman_deformable_multi_frame \
+#     resume=/app/TMOT/models/trackformer_models_v1/mot17_crowdhuman_deformable_multi_frame/checkpoint_epoch_40.pth
+#     mot_path_train=/app/TMOT/data/MOT17 \
+#     mot_path_val=/app/TMOT/data/MOT17 \
+#     train_split=mot17_train_coco
+#     val_split=mot17_train_cross_val_frame_0_5_to_1_0_coco
+
+
+# python src/train.py with \
+#     flir_adas_v2 \
+#     deformable \
+#     multi_frame \
+#     tracking \
+#     output_dir=models/flir_adas_v2_deformable_multi_frame \
+#     resume=/app/TMOT/models/trackformer_models_v1/r50_deformable_detr_plus_iterative_bbox_refinement-checkpoint_hidden_dim_288.pth
+
+# python src/train.py with \
+#     mot17 \
+#     deformable \
+#     multi_frame \
+#     tracking \
+#     output_dir=models/flir_adas_v2_deformable_multi_frame \
+#     resume=/app/TMOT/models/trackformer_models_v1/r50_deformable_detr_plus_iterative_bbox_refinement-checkpoint_hidden_dim_288.pth
+
 def train(args: Namespace) -> None:
     print(args)
 
@@ -65,8 +96,9 @@ def train(args: Namespace) -> None:
         assert args.num_feature_levels == 1
     if args.tracking:
         # assert args.batch_size == 1
-
-        if args.tracking_eval:
+        if args.dataset == 'flir_adas_v2':
+            pass  #todo : 나중에 eval하는 코드 빠져나가게 하기
+        elif args.tracking_eval:
             assert 'mot' in args.dataset
 
     output_dir = Path(args.output_dir)
@@ -226,6 +258,8 @@ def train(args: Namespace) -> None:
                 print(f"Load {k} {tuple(v.shape)} from resume model "
                       f"{tuple(checkpoint_value.shape)}.")
             elif args.resume_shift_neuron and 'class_embed' in k:
+                print("k", k)
+                print(input())
                 checkpoint_value = checkpoint_state_dict[k]
                 # no-object class
                 resume_value = checkpoint_value.clone()
