@@ -73,6 +73,10 @@ ex.add_named_config('flir_adas_v2_crowdhuman','cfgs/train_mot17_crowdhuman.yaml'
 #     tracking \
 #     output_dir=models/flir_adas_v2_deformable_multi_frame \
 #     resume=/app/TMOT/models/trackformer_models_v1/r50_deformable_detr_plus_iterative_bbox_refinement-checkpoint_hidden_dim_288.pth
+#     train_split=train_coco \
+#     val_split=val_coco \
+#     epoch=20
+
 
 # python src/train.py with \
 #     mot17 \
@@ -81,6 +85,8 @@ ex.add_named_config('flir_adas_v2_crowdhuman','cfgs/train_mot17_crowdhuman.yaml'
 #     tracking \
 #     output_dir=models/flir_adas_v2_deformable_multi_frame \
 #     resume=/app/TMOT/models/trackformer_models_v1/r50_deformable_detr_plus_iterative_bbox_refinement-checkpoint_hidden_dim_288.pth
+
+
 
 def train(args: Namespace) -> None:
     print(args)
