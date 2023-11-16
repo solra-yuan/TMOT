@@ -35,6 +35,17 @@ for split in ['TRAIN', 'TEST', 'ALL', '01', '02', '05', '06', '07', '09', '11', 
         lambda kwargs, split=split: MOTS20Wrapper(split, **kwargs))
 
 DATASETS['DEMO'] = (lambda kwargs: [DemoSequence(**kwargs), ])
+# custom data
+for split in [
+                'video-BzZspxAweF8AnKhWK', 
+                'video-FkqCGijjAKpABetZZ', 
+                'video-PGdt7pJChnKoJDt35', 
+                'video-RMxN6a4CcCeLGu4tA', 
+                'video-YnfPeH8i2uBWmsSd2', 
+                'video-dvZBYnphN2BwdMKBc', 
+                'video-hnbGXq3nNPjBbc7CL', 
+                'video-msNEBxJE5PPDqenBM']:
+    DATASETS[split] = (lambda kwargs: [DemoSequence(**kwargs), ])
 
 
 class TrackDatasetFactory:
