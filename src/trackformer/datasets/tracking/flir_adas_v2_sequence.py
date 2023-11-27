@@ -1,6 +1,5 @@
-# Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved
 """
-MOT17 sequence dataset.
+flir_adas_v2 sequence dataset.
 """
 import configparser
 import csv
@@ -8,6 +7,7 @@ import os
 import os.path as osp
 from argparse import Namespace
 from typing import Optional, Tuple, List
+import json
 
 import numpy as np
 import torch
@@ -18,33 +18,34 @@ if __name__ != '__main__':
     from ..coco import make_coco_transforms
     from ..transforms import Compose
 
-
-class MOT17Sequence(Dataset):
-    """Multiple Object Tracking (MOT17) Dataset.
-
-    This dataloader is designed so that it can handle only one sequence,
-    if more have to be handled one should inherit from this class.
+ 
+class FLIR_ADAS_V2_Sequence(Dataset):
     """
-    data_folder = 'MOT17'
+    Reimplemented based on MOT17Sequence,
+    this dataloader handles one FLIR_ADAS_V2 sequence.
+    """
+    data_folder = 'flir_adas_v2'
 
     def __init__(self, root_dir: str = 'data', seq_name: Optional[str] = None,
-                 dets: str = '', vis_threshold: float = 0.0, img_transform: Namespace = None) -> None:
+                 vis_threshold: float = 0.0, img_transform: Namespace = None) -> None:
         """
         Args:
             seq_name (string): Sequence to take
-            vis_threshold (float): Threshold of visibility of persons
-                                   above which they are selected
+            vis_threshold (float): orginally intended to take in 
+                                   Threshold of visibility of persons
+                                   above which they are selected,
+                                   but generalized to take in all categories
         """
         super().__init__()
 
         self._seq_name = seq_name
-        self._dets = dets
         self._vis_threshold = vis_threshold
-
+        
         self._data_dir = osp.join(root_dir, self.data_folder)
 
-        self._train_folders = os.listdir(os.path.join(self._data_dir, 'train'))
-        self._test_folders = os.listdir(os.path.join(self._data_dir, 'test'))
+        # todo : separate train and test 
+        self._train_seqs = [item[:23] for item in os.listdir(os.path.join(self._data_dir, 'video_rgb_test', 'data'))]
+        self._test_seqs = [item[:23] for item in os.listdir(os.path.join(self._data_dir, 'video_rgb_test', 'data'))]
 
         self.transforms = Compose(make_coco_transforms('val', img_transform, overflow_boxes=True))
 
@@ -52,14 +53,12 @@ class MOT17Sequence(Dataset):
         self.no_gt = True
         if seq_name is not None:
             full_seq_name = seq_name
-            if self._dets is not None:
-                full_seq_name = f"{seq_name}-{dets}"
-            assert full_seq_name in self._train_folders or full_seq_name in self._test_folders, \
+            assert full_seq_name in self._train_seqs or full_seq_name in self._test_seqs, \
                 'Image set does not exist: {}'.format(full_seq_name)
 
             self.data = self._sequence()
             self.no_gt = not osp.exists(self.get_gt_file_path())
-
+            
     def __len__(self) -> int:
         return len(self.data)
 
@@ -80,31 +79,25 @@ class MOT17Sequence(Dataset):
         sample['vis'] = data['vis']
         sample['orig_size'] = torch.as_tensor([int(height_orig), int(width_orig)])
         sample['size'] = torch.as_tensor([int(height), int(width)])
-
+    
         return sample
 
     def _sequence(self) -> List[dict]:
-        # public detections
+        '''
+    def _sequence(self) -> List[dict]:
+        total = []
+        for filename in sorted(os.listdir(self._data_dir)):
+            extension = os.path.splitext(filename)[1]
+            if extension in ['.png', '.jpg']:
+                total.append({'im_path': osp.join(self._data_dir, filename)})
+
+        return total        
+        '''
         dets = {i: [] for i in range(1, self.seq_length + 1)}
-        det_file = self.get_det_file_path()
-
-        if osp.exists(det_file):
-            with open(det_file, "r") as inf:
-                reader = csv.reader(inf, delimiter=',')
-                for row in reader:
-                    x1 = float(row[2]) - 1
-                    y1 = float(row[3]) - 1
-                    # This -1 accounts for the width (width of 1 x1=x2)
-                    x2 = x1 + float(row[4]) - 1
-                    y2 = y1 + float(row[5]) - 1
-                    score = float(row[6])
-                    bbox = np.array([x1, y1, x2, y2, score], dtype=np.float32)
-                    dets[int(float(row[0]))].append(bbox)
-
+        
         # accumulate total
         img_dir = osp.join(
-            self.get_seq_path(),
-            self.config['Sequence']['imDir'])
+            self.get_seq_path())
 
         boxes, visibility = self.get_track_boxes_and_visbility()
 
@@ -127,55 +120,28 @@ class MOT17Sequence(Dataset):
             visibility[i] = {}
 
         gt_file = self.get_gt_file_path()
+    
         if not osp.exists(gt_file):
             return boxes, visibility
-
-        with open(gt_file, "r") as inf:
-            reader = csv.reader(inf, delimiter=',')
-            for row in reader:
-                # class person, certainity 1
-                if int(row[6]) == 1 and int(row[7]) == 1 and float(row[8]) >= self._vis_threshold:
-                    # Make pixel indexes 0-based, should already be 0-based (or not)
-                    x1 = int(row[2]) - 1
-                    y1 = int(row[3]) - 1
-                    # This -1 accounts for the width (width of 1 x1=x2)
-                    x2 = x1 + int(row[4]) - 1
-                    y2 = y1 + int(row[5]) - 1
-                    bbox = np.array([x1, y1, x2, y2], dtype=np.float32)
-
-                    frame_id = int(row[0])
-                    track_id = int(row[1])
-
-                    boxes[frame_id][track_id] = bbox
-                    visibility[frame_id][track_id] = float(row[8])
-
-        return boxes, visibility
+        
 
     def get_seq_path(self) -> str:
         """ Return directory path of sequence. """
         full_seq_name = self._seq_name
-        if self._dets is not None:
-            full_seq_name = f"{self._seq_name}-{self._dets}"
 
-        if full_seq_name in self._train_folders:
-            return osp.join(self._data_dir, 'train', full_seq_name)
+        if full_seq_name in self._train_seqs:
+            return osp.join(osp.join(self._data_dir, 'video_rgb_test'), 'data')
         else:
-            return osp.join(self._data_dir, 'test', full_seq_name)
+            return osp.join(osp.join(self._data_dir, 'video_rgb_test'), 'data')
 
     def get_config_file_path(self) -> str:
         """ Return config file of sequence. """
-        return osp.join(self.get_seq_path(), 'seqinfo.ini')
+        return osp.join(self.get_seq_path(), f'seqinfo_{self._seq_name}.ini')
 
     def get_gt_file_path(self) -> str:
         """ Return ground truth file of sequence. """
-        return osp.join(self.get_seq_path(), 'gt', 'gt.txt')
+        return osp.join(osp.dirname(self.get_seq_path()), 'coco.json')
 
-    def get_det_file_path(self) -> str:
-        """ Return public detections file of sequence. """
-        if self._dets is None:
-            return ""
-
-        return osp.join(self.get_seq_path(), 'det', 'det.txt')
 
     @property
     def config(self) -> dict:
@@ -192,18 +158,26 @@ class MOT17Sequence(Dataset):
     @property
     def seq_length(self) -> int:
         """ Return sequence length, i.e, number of frames. """
-        return int(self.config['Sequence']['seqLength'])
+        
+        seq_info_dict ={'video-BzZspxAweF8AnKhWK': {'img_width': 1024, 'img_height': 1224, 'seq_length': 338}, 
+    'video-FkqCGijjAKpABetZZ': {'img_width': 1024, 'img_height': 1224, 'seq_length': 226}, 
+    'video-PGdt7pJChnKoJDt35': {'img_width': 1024, 'img_height': 1224, 'seq_length': 208}, 
+    'video-RMxN6a4CcCeLGu4tA': {'img_width': 768, 'img_height': 1024, 'seq_length': 1033}, 
+    'video-YnfPeH8i2uBWmsSd2': {'img_width': 1024, 'img_height': 1224, 'seq_length': 540}, 
+    'video-dvZBYnphN2BwdMKBc': {'img_width': 768, 'img_height': 1024, 'seq_length': 565}, 
+    'video-hnbGXq3nNPjBbc7CL': {'img_width': 1024, 'img_height': 1224, 'seq_length': 411}, 
+    'video-msNEBxJE5PPDqenBM': {'img_width': 1024, 'img_height': 1224, 'seq_length': 428}}
+
+
+        return int(seq_info_dict[self._seq_name]['seq_length'] )
 
     def __str__(self) -> str:
-        return f"{self._seq_name}-{self._dets}"
+        return f"{self._seq_name}"
 
     @property
     def results_file_name(self) -> str:
         """ Generate file name of results file. """
         assert self._seq_name is not None, "[!] No seq_name, probably using combined database"
-
-        if self._dets is None:
-            return f"{self._seq_name}.txt"
 
         return f"{self}.txt"
 
@@ -272,6 +246,7 @@ class MOT17Sequence(Dataset):
 
         return results
 
+
 if __name__ == '__main__':
     if __package__ == None:
         import sys  
@@ -281,16 +256,12 @@ if __name__ == '__main__':
         from trackformer.datasets.coco import make_coco_transforms   
         from trackformer.datasets.transforms import Compose
 
-        MOT17 = MOT17Sequence(seq_name='MOT17-02', dets='DPM')
-        print(MOT17._seq_name)
-        print(MOT17.__len__())
-        motseq = MOT17._sequence()
+        FLIR = FLIR_ADAS_V2_Sequence(root_dir='/app/TMOT/data', seq_name='video-BzZspxAweF8AnKhWK')
+        print(FLIR._seq_name)
+        print(FLIR.__len__())
+        motseq = FLIR._sequence()
         from pprint import pprint
         pprint(motseq[0])
         print("----------------")
         pprint(motseq[1])
-        print("*********************")
-        pprint(MOT17.config['Sequence']['imDir'])
-        print("-----------------")
-        pprint(MOT17.config['Sequence'])
-
+        print("FLIR seq length", FLIR.seq_length)

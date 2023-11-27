@@ -21,6 +21,20 @@ for split in ['TRAIN', 'TEST', 'ALL', '01', '02', '03', '04', '05',
         DATASETS[name] = (
             lambda kwargs, split=split, dets=dets: MOT17Wrapper(split, dets, **kwargs))
 
+# custom data
+# split을 어디서 받아오는지 볼 것. TRAIN, TEST, ALL을 어디서 주는거임?
+for split in ['TRAIN', 'TEST', 'ALL',
+              'video-BzZspxAweF8AnKhWK', 
+              'video-FkqCGijjAKpABetZZ', 
+              'video-PGdt7pJChnKoJDt35', 
+              'video-RMxN6a4CcCeLGu4tA', 
+              'video-YnfPeH8i2uBWmsSd2', 
+              'video-dvZBYnphN2BwdMKBc', 
+              'video-hnbGXq3nNPjBbc7CL', 
+              'video-msNEBxJE5PPDqenBM']:
+    name = f"{split}"
+    DATASETS[name] = (
+        lambda kwargs, split=split: MOT17Wrapper(split, **kwargs))
 
 for split in ['TRAIN', 'TEST', 'ALL', '01', '02', '03', '04', '05',
               '06', '07', '08']:
@@ -28,24 +42,14 @@ for split in ['TRAIN', 'TEST', 'ALL', '01', '02', '03', '04', '05',
     DATASETS[name] = (
         lambda kwargs, split=split: MOT20Wrapper(split, **kwargs))
 
-
 for split in ['TRAIN', 'TEST', 'ALL', '01', '02', '05', '06', '07', '09', '11', '12']:
     name = f'MOTS20-{split}'
     DATASETS[name] = (
         lambda kwargs, split=split: MOTS20Wrapper(split, **kwargs))
 
 DATASETS['DEMO'] = (lambda kwargs: [DemoSequence(**kwargs), ])
-# custom data
-for split in [
-                'video-BzZspxAweF8AnKhWK', 
-                'video-FkqCGijjAKpABetZZ', 
-                'video-PGdt7pJChnKoJDt35', 
-                'video-RMxN6a4CcCeLGu4tA', 
-                'video-YnfPeH8i2uBWmsSd2', 
-                'video-dvZBYnphN2BwdMKBc', 
-                'video-hnbGXq3nNPjBbc7CL', 
-                'video-msNEBxJE5PPDqenBM']:
-    DATASETS[split] = (lambda kwargs: [DemoSequence(**kwargs), ])
+
+
 
 
 class TrackDatasetFactory:

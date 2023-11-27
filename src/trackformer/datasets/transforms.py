@@ -10,6 +10,10 @@ import torch
 import torchvision.transforms as T
 import torchvision.transforms.functional as F
 
+if __package__ == None:
+    import sys
+    from os import path
+    sys.path.append(path.dirname( path.dirname( path.abspath(__file__) ) ))
 from ..util.box_ops import box_xyxy_to_cxcywh
 from ..util.misc import interpolate
 

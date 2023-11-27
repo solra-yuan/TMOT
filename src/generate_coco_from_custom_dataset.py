@@ -1,4 +1,3 @@
-# Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved
 """
 Generates COCO data and annotation structure from MOTChallenge data.
 """
@@ -9,6 +8,7 @@ import json
 import os
 import shutil
 from pathlib import Path
+
 import numpy as np
 import pycocotools.mask as rletools
 import skimage.io as io
@@ -18,68 +18,15 @@ from pycocotools.coco import COCO
 from scipy.optimize import linear_sum_assignment
 from torchvision.ops.boxes import box_iou
 
+from trackformer.datasets.tracking.mots20_sequence import load_mots_gt
+
+CUSTOM_ROOT = '/app/TMOT/data/flir_adas_v2/'
+VIS_THRESHOLD = 0.25
+
 FLIR_ADAS_V2 = True
-FLIR_ADAS_V2_ROOT = '/app/data/flir_adas_v2_orig/video_rgb_test/data'
-CUSTOM_ROOT = None
 
-TARGET_ROOT = '/app/TMOT/data/flir_adas_v2'
-
-
-FLIR_ADAS_V2_SEQS_INFO = {}
-SEQS_INFO = {}
-
-VIS_THRESHOLD = 0.25 ## 
-
-
-# dataset preview
-if __name__ == '__main__':
-
-    DATA_ROOT = CUSTOM_ROOT
-    if FLIR_ADAS_V2:
-        DATA_ROOT = os.path.join(FLIR_ADAS_V2_ROOT)
-
-    vidnames = sorted(os.listdir(DATA_ROOT))
-    
-    seqs = {v[:23]:None for v in vidnames}
-    print("seqlen", len(seqs), seqs)
-    '''
-    {'video-BzZspxAweF8AnKhWK': None, 
-    'video-FkqCGijjAKpABetZZ': None, 
-    'video-PGdt7pJChnKoJDt35': None, 
-    'video-RMxN6a4CcCeLGu4tA': None, 
-    'video-YnfPeH8i2uBWmsSd2': None, 
-    'video-dvZBYnphN2BwdMKBc': None, 
-    'video-hnbGXq3nNPjBbc7CL': None, 
-    'video-msNEBxJE5PPDqenBM': None}
-    '''
-
-    for seq in seqs:
-        # check sequence length
-        seqlist = [name for name in vidnames if seq in name]
-        print("seqname: ", seq, "length: ", len(seqlist))
-
-        seq_first_im = plt.imread(os.path.join(DATA_ROOT, seqlist[0]))
-        seq_first_im_shape = seq_first_im.shape
-        # data size check
-        # for img_name in seqlist:
-        #     im = plt.imread(os.path.join(CUSTOM_ROOT, 'data', img_name))
-        #     if im.shape != seq_first_im_shape:
-        #         print(im.shape)  ## raise assertionerror
-        #     # check
-        if FLIR_ADAS_V2:
-            FLIR_ADAS_V2_SEQS_INFO[seq] = {'img_width': seq_first_im_shape[0],
-                                        'img_height': seq_first_im_shape[1],
-                                        'seq_length': len(seqlist)}
-        else:
-            SEQS_INFO[seq] = {'img_width': seq_first_im_shape[0],
-                                        'img_height': seq_first_im_shape[1],
-                                        'seq_length': len(seqlist)}
-    if FLIR_ADAS_V2:
-        SEQS_INFO = FLIR_ADAS_V2_SEQS_INFO
-
-    print(SEQS_INFO)
-    """
-    {'video-BzZspxAweF8AnKhWK': {'img_width': 1024, 'img_height': 1224, 'seq_length': 338}, 
+CUSTOM_SEQS_INFO = {
+    'video-BzZspxAweF8AnKhWK': {'img_width': 1024, 'img_height': 1224, 'seq_length': 338}, 
     'video-FkqCGijjAKpABetZZ': {'img_width': 1024, 'img_height': 1224, 'seq_length': 226}, 
     'video-PGdt7pJChnKoJDt35': {'img_width': 1024, 'img_height': 1224, 'seq_length': 208}, 
     'video-RMxN6a4CcCeLGu4tA': {'img_width': 768, 'img_height': 1024, 'seq_length': 1033}, 
@@ -87,46 +34,32 @@ if __name__ == '__main__':
     'video-dvZBYnphN2BwdMKBc': {'img_width': 768, 'img_height': 1024, 'seq_length': 565}, 
     'video-hnbGXq3nNPjBbc7CL': {'img_width': 1024, 'img_height': 1224, 'seq_length': 411}, 
     'video-msNEBxJE5PPDqenBM': {'img_width': 1024, 'img_height': 1224, 'seq_length': 428}}
-    """
-    print()
-# vidseq_to_names = {}
-# video-5tYghHhFktjq4nQ5R-frame-001685-4kSNcWCSXX6FZyiZz
-# video-5zpwfwcv9hXTFxw8m-frame-003207-EJa2An8JwK5o58BHh
 
-def generate_coco_from_custom(split_name='train_coco', seqs_names=None,
-                              root_split='train', flir_adas_v2=False, 
-                              frame_range=None, 
-                              data_root='data/flir_adas_v2',
-                              ):
+
+def generate_coco_from_custom(split_name='train', seqs_names=None,
+                           root_split='train', flir_adas_v2=False,
+                           frame_range=None, data_root='data/flir_adas_v2'):
     """
-    Generates COCO data for Multi-object-tracking from custom dataset
+    Generates COCO data from CUSTOM DATA.
     """
 
     if frame_range is None:
         frame_range = {'start': 0.0, 'end': 1.0}
 
     if flir_adas_v2:
-        CUSTOM_ROOT = FLIR_ADAS_V2_ROOT
-        # CUSTOM_ROOT = os.path.join(FLIR_ADAS_V2_ROOT, root_split) # if root_split same to split_name.
+        data_root = CUSTOM_ROOT
+    root_split_path = os.path.join(data_root, root_split)
+    root_split_custom_path = os.path.join(CUSTOM_ROOT, root_split)
+    coco_dir = os.path.join(data_root, split_name)
 
-    # original custom data root
-    root_split_path = os.path.join(CUSTOM_ROOT) 
-
-    # target custom data root
-    coco_dir = os.path.join(data_root, split_name)    #target root
-    print("target dir", coco_dir)
     if os.path.isdir(coco_dir):
         shutil.rmtree(coco_dir)
-    os.makedirs(coco_dir, exist_ok=True)
 
-    
+    os.mkdir(coco_dir)
 
-    # make annotations
     annotations = {}
     annotations['type'] = 'instances'
     annotations['images'] = []
-    
-    ## todo : check labels
     annotations['categories'] = [ {'id': 1, 'name': 'person', 'supercategory': 'unknown'},
                                   {'id': 2, 'name': 'bike', 'supercategory': 'unknown'},
                                   {'id': 3, 'name': 'car', 'supercategory': 'unknown'},
@@ -137,8 +70,6 @@ def generate_coco_from_custom(split_name='train_coco', seqs_names=None,
                                   {'id': 8, 'name': 'sign', 'supercategory': 'unknown'},
                                   {'id': 9, 'name': 'other vehicle', 'supercategory': 'unknown'},
                                   {'id': 10, 'name': 'dog', 'supercategory': 'unknown'}]
-
-        
     # {'id': 1, 'name': 'person', 'supercategory': 'unknown'}
     # {'id': 2, 'name': 'bike', 'supercategory': 'unknown'}
     # {'id': 3, 'name': 'car', 'supercategory': 'unknown'}
@@ -149,7 +80,6 @@ def generate_coco_from_custom(split_name='train_coco', seqs_names=None,
     # {'id': 12, 'name': 'sign', 'supercategory': 'unknown'}
     # {'id': 79, 'name': 'other vehicle', 'supercategory': 'unknown'}
     # {'id': 17, 'name': 'dog', 'supercategory': 'unknown'}
-
     coco_orig_category_id_to_sorted_order_dict = {1:1, 
                                                   2:2, 
                                                   3:3, 
@@ -161,159 +91,143 @@ def generate_coco_from_custom(split_name='train_coco', seqs_names=None,
                                                   79:9, 
                                                   17:10}
 
+
     annotations['annotations'] = []
 
     annotations_dir = os.path.join(os.path.join(data_root, 'annotations'))
-
-    # if split is {train,test} , CUSTOM annotation directory now resembles this.
-    # |-data
-    # | |-CUSTOMDATA
-    # | | |-annotations
-    # | | | |-train.json
-    # | | | |-test.json
-    
     if not os.path.isdir(annotations_dir):
         os.mkdir(annotations_dir)
     annotation_file = os.path.join(annotations_dir, f'{split_name}.json')
-    
-    # IMAGE FILES
-    img_id = 0
 
-    # load img sequences(sorted) list
-    full_seqs = sorted(os.listdir(root_split_path))
-    seqs = sorted(list({se[:23] for se in full_seqs}))
+    # IMAGE FILES
+    img_id = 0  # 모든 시퀀스 대해 통합된 image id임
+
+    print("root_split_path", root_split_path)
+    seqs = sorted(os.listdir(root_split_path))
+
     if seqs_names is not None:
         seqs = [s for s in seqs if s in seqs_names]
-
     annotations['sequences'] = seqs
     annotations['frame_range'] = frame_range
+    print(split_name, seqs)
 
-    print("in this split, these sequences are included:")
-    print(split_name, len(seqs))
-    
+    orig_image_name_to_parsed_image_id = {}
+
     for seq in seqs:
+        # CONFIG FILE
+        config = configparser.ConfigParser()
+        config_file = os.path.join(root_split_path, seq, 'seqinfo.ini')
 
-        img_width = SEQS_INFO[seq]['img_width']
-        img_height = SEQS_INFO[seq]['img_height']
-        seq_length = SEQS_INFO[seq]['seq_length']
+        if os.path.isfile(config_file):
+            config.read(config_file)
+            img_width = int(config['Sequence']['imWidth'])
+            img_height = int(config['Sequence']['imHeight'])
+            seq_length = int(config['Sequence']['seqLength'])
 
-        # custom datasets where
-        # all image sequences is collected in one directories.
-
-        this_seg_list = [f for f in full_seqs if seq in f]
+        seg_list_dir = os.listdir(os.path.join(root_split_path, seq, 'img1'))
         start_frame = int(frame_range['start'] * seq_length)
         end_frame = int(frame_range['end'] * seq_length)
-        this_seg_list = this_seg_list[start_frame: end_frame]
-        print(f"{seq}: {len(this_seg_list)}/{seq_length}")
-        seq_length = len(this_seg_list)
+        seg_list_dir = seg_list_dir[start_frame: end_frame]
 
-        # load file list in sorted order. [must be sorted?]
-        for i, img in enumerate(sorted(this_seg_list)):
+        print(f"{seq}: {len(seg_list_dir)}/{seq_length}")
+        seq_length = len(seg_list_dir)
+
+        for i, img in enumerate(sorted(seg_list_dir)):
+            
             if i == 0:
                 first_frame_image_id = img_id
+                print("seq first file name ", img)
 
-            annotations['images'].append({"file_name":img,
+            annotations['images'].append({"file_name": f"{seq}_{img}",
                                           "height": img_height,
                                           "width": img_width,
                                           "id": img_id,
                                           "frame_id": i,
                                           "seq_length": seq_length,
                                           "first_frame_image_id": first_frame_image_id})
+
+            orig_image_name_to_parsed_image_id[img] = img_id
             if i == 0 :
-                print(annotations['images'][-1])
-            # "file_name": file name.
-            # height : image height of any sequence image
-            # width : image width of any sequence image
-            # id : unique number inside total image sets
-            # frame_id : frame order in sequence
-            # seq_length : (sequence length) * (frame range ratio(0~1))
-            # first_frame_image_id : image id of each sequence's first image
+                print(annotations['images'][-1]) # peek last parsed image_annot
+                print("orig_img_name",img, "img_id:", img_id)
             img_id += 1
 
-            # make symbolic link of original files
-            os.symlink(os.path.join(root_split_path, img),
-                       os.path.join(coco_dir, f"{img}")) # img file name is preserved.
-    
+            os.symlink(os.path.join(os.getcwd(), root_split_path, seq, 'img1', img),
+                       os.path.join(coco_dir, f"{seq}_{img}"))
     # GT
     annotation_id = 0
-    # img_file_name_to_id = {
-    #      img_dict['file_name']: img_dict['id']
-    #      for img_dict in annotations['images']}
-    image_id_to_image_seq = {
-        img_dict['id']: img_dict['file_name'][:23]
-        for img_dict in annotations['images']
-    }
 
-    # for seq in seqs:   ## sequence 개수만큼 처리하고 있다. ㅇㅅㅇ.... 이 루프는 필요없다. 그래서 시퀀스 개수만큼 저장하는 건가?
     # GT FILE
-    gt_file_path = os.path.join(Path(root_split_path).parents[0], 'coco.json')  # gt_file_path: CUSTOM file이 COCO 양식이면 COCO.json 위치
+    gt_file_path = os.path.join(Path(root_split_path).parents[0], 'coco_gt', 'coco.json')
+    print("gt_file_path", gt_file_path)
     if flir_adas_v2:
         gt_file_path = os.path.join(
-            Path(root_split_path).parents[0],'coco.json'
-        )
-
+            Path(root_split_path).parents[0], 
+            'coco_gt', 
+            'coco.json')
     nan_track_id_count = 0
-    # 이거 시퀀스별로 annotation 어떻게 나눠?
-    # 설마 annotation에서 image id 보고
-    # image id에 해당하는 image file 이름 읽어서
-    # sequence 이름이랑 매칭한 후에
-    # 시퀀스별로 저장이야?
+    for seq in seqs:       
+        if not os.path.isfile(gt_file_path):
+            continue
+        
+        seq_annotations = []
 
-    seq_annotations = []
-    
-    if flir_adas_v2:
-        with open(gt_file_path, "r") as gt_file:
-            annot_json_data = json.load(gt_file)
+        if flir_adas_v2:
+            with open(gt_file_path, "r") as gt_file:
+                annot_json_data = json.load(gt_file)
 
-        # change annotation id to 0-based index.
-        # don't ignore items
-        # visibility set to 1
-        # add sequence name field 
-        flag1 = True
-        for annot in annot_json_data['annotations']:
-            if flag1:
-                print("annot", annot)
-                flag1 = False
-            image_seq = image_id_to_image_seq.get(annot['image_id'], None)
-            if image_seq is None:
-                continue
-            annotation = {
-                "id": annotation_id,
-                "bbox": annot['bbox'],
-                "image_id": annot['image_id'],
-                "segmentation": annot['segmentation'],
-                "ignore": 0 if annot['category_id'] else 1, 
-                "visibility": 1.0,
-                "area": annot['area'],
-                "iscrowd": 1 if annot['iscrowd'] else 0,
-                "seq": image_seq,
-                "category_id": coco_orig_category_id_to_sorted_order_dict[annot['category_id']],  
-                "track_id": annot['track_id']+1 if 'track_id' in annot else -1  # track_id는 1부터 시작함
+            # coco from mot할 땐 mot annotation이 이게 seq의 어느 frame_id에서 온지 정보가 있음
+            # sorting된 시퀀스 내에서 sorting된 frame_id는 이름의 인덱스가 됨
+            # -> (frame_id와 seq)를 key로 image name to image_id를 추출할 수 있음
+            # flir_adas_v2의 annotation에서는 img_id가 존재
+            # 오리지널 images annotation을 참조, 
+            # img_id로부터 img 이름을 얻고 seq에 포함되지 않으면 filter out하고 나머지만 parse
+                
+            orig_image_id_to_image_name = {
+                            img_dict['id']: img_dict['file_name']
+                            for img_dict in annot_json_data['images']}
+            # change annotation id to 0-based index.
+            # don't ignore items
+            # visibility set to 1
+            # add sequence name field
+            print_first = True
+            for annot in annot_json_data['annotations']:
+                image_name = orig_image_id_to_image_name.get(annot['image_id'], None)
+                if image_name:
+                    image_seq = image_name[5:28]
+                if seq != image_seq:
+                    continue
+                if print_first:
+                    print("first annot", annot)
+                    print("first annotation of the seq:", image_seq)
+                    print("annot['image_id']: ",annot['image_id'])
+                    print("orig_image_id_to_image_name[annot['image_id]]: ",orig_image_id_to_image_name[annot['image_id']] )
+                    print_first = False
+
+                annotation = {
+                    "id" : annotation_id,
+                    "bbox":annot['bbox'],
+                    "image_id": orig_image_name_to_parsed_image_id[image_name[5:]],
+                    "segmentation": annot['segmentation'],
+                    "ignore": 0 if annot['category_id'] else 1,
+                    "visibility": 1.0,
+                    "area": annot['area'],
+                    "iscrowd": 1 if annot['iscrowd'] else 0,
+                    "seq": image_seq,
+                    "category_id": coco_orig_category_id_to_sorted_order_dict[annot['category_id']],
+                    "track_id": annot['track_id']+1 if 'track_id' in annot else -1  # track_id는 1부터 시작함
                 }
-            if annotation['track_id'] == -1:
-                nan_track_id_count += 1
-                print("track id is nan!", nan_track_id_count)
-                print("annotation", annotation['track_id'])
+                if annotation['track_id'] == -1:
+                    nan_track_id_count += 1
+                    print("track id is nan!", nan_track_id_count)
+                    print("track id == nan annotation", annotation)
+                
+                seq_annotations.append(annotation)
+                annotation_id += 1
+                # if frame_id not in seq_annoataions_per_frame: # needed when mots_vis = true, ignore this for now
 
-            # {
-            #   "annotations": [{"area": 4095, "bbox": [495, 441, 91, 45],
-            #                    "category_id": 3,
-            #                    "extra_info": {"human_annotated": "human"},
-            #                    "id": 1, "image_id": 0, "iscrowd": false,
-            #                    "segmentation": [[495,441,586,441, 495, 486,586,486]],
-            #                    "track_id": 0},
-            #                   {"area": 2106,"bbox": [
-
-            seq_annotations.append(annotation)
-            annotation_id += 1
-        print('nan track id count', nan_track_id_count)
-        
         annotations['annotations'].extend(seq_annotations)
-    else:
-        # TODO : flir_adas_v2가 아닐 때(CUSTOM) parsing    
-        pass
-        
-        
+
     # max objs per image
     num_objs_per_image = {}
     for anno in annotations['annotations']:
@@ -323,15 +237,16 @@ def generate_coco_from_custom(split_name='train_coco', seqs_names=None,
             num_objs_per_image[image_id] += 1
         else:
             num_objs_per_image[image_id] = 1
-    
-    print("num_objs_per_image", num_objs_per_image)
 
     print(f'max objs per image: {max(list(num_objs_per_image.values()))}')
 
     with open(annotation_file, 'w') as anno_file:
         json.dump(annotations, anno_file, indent=4)
-    
+
 if __name__ == '__main__':
+    # generate_coco_from_custom(split_name='train_custom_testing', seqs_names=None,
+    #                       root_split='train', flir_adas_v2=True,
+    #                       data_root='data/flir_adas_v2')
     """
     {'video-BzZspxAweF8AnKhWK': {'img_width': 1024, 'img_height': 1224, 'seq_length': 338}, 
     'video-FkqCGijjAKpABetZZ': {'img_width': 1024, 'img_height': 1224, 'seq_length': 226}, 
@@ -342,22 +257,26 @@ if __name__ == '__main__':
     'video-hnbGXq3nNPjBbc7CL': {'img_width': 1024, 'img_height': 1224, 'seq_length': 411}, 
     'video-msNEBxJE5PPDqenBM': {'img_width': 1024, 'img_height': 1224, 'seq_length': 428}}
     """
-    trainseq = ['video-BzZspxAweF8AnKhWK', 'video-FkqCGijjAKpABetZZ', 'video-PGdt7pJChnKoJDt35',
-                'video-RMxN6a4CcCeLGu4tA', 'video-YnfPeH8i2uBWmsSd2']
-    valseq = ['video-dvZBYnphN2BwdMKBc', 'video-hnbGXq3nNPjBbc7CL']
-    testseq = ['video-msNEBxJE5PPDqenBM']
-    generate_coco_from_custom(split_name='train_coco', seqs_names=trainseq,
+    train_sequences = ['video-BzZspxAweF8AnKhWK', 
+                       'video-FkqCGijjAKpABetZZ', 
+                       'video-PGdt7pJChnKoJDt35']
+    val_sequences = ['video-RMxN6a4CcCeLGu4tA',
+                     'video-YnfPeH8i2uBWmsSd2',
+                     'video-dvZBYnphN2BwdMKBc',]
+    test_sequences = ['video-hnbGXq3nNPjBbc7CL',
+                      'video-msNEBxJE5PPDqenBM']
+    generate_coco_from_custom(split_name='train_coco', seqs_names=train_sequences,
                               root_split='train', flir_adas_v2=True, 
                               frame_range=None, 
-                              data_root=TARGET_ROOT,
+                              data_root=CUSTOM_ROOT,
                               )
-    generate_coco_from_custom(split_name='val_coco', seqs_names=valseq,
+    generate_coco_from_custom(split_name='val_coco', seqs_names=val_sequences,
                               root_split='train', flir_adas_v2=True, 
                               frame_range=None, 
-                              data_root=TARGET_ROOT,
+                              data_root=CUSTOM_ROOT,
                               )
-    generate_coco_from_custom(split_name='test_coco', seqs_names=testseq,
+    generate_coco_from_custom(split_name='test_coco', seqs_names=test_sequences,
                               root_split='train', flir_adas_v2=True, 
                               frame_range=None, 
-                              data_root=TARGET_ROOT,
+                              data_root=CUSTOM_ROOT,
                               )

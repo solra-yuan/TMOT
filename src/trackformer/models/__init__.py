@@ -20,10 +20,12 @@ def build_model(args):
         num_classes = 250
     elif args.dataset in ['coco_person', 'mot', 'mot_crowdhuman', 'crowdhuman', 'mot_coco_person']:
         # num_classes = 91
-        num_classes = 20
+        num_classes = 20  
+        # The author said single class doesnt work well to compute focal loss. 
+        # however choice of 20 classes is a bit arbitrary
         # num_classes = 1
     elif args.dataset in ['flir_adas_v2', 'flir_adas_v2_crowdhuman']:
-        num_classes = 20 ## okay. why 20? this is not related to category #. 
+        num_classes = 10 # I suppose it's okay to set num_classes to 10 bc I have multiple categories.
     else:
         raise NotImplementedError
 

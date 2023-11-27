@@ -7,7 +7,7 @@ from torch.utils.data import Dataset
 from .mot17_sequence import MOT17Sequence
 from .mot20_sequence import MOT20Sequence
 from .mots20_sequence import MOTS20Sequence
-
+from .flir_adas_v2_sequence import FLIR_ADAS_V2_Sequence
 
 class MOT17Wrapper(Dataset):
     """A Wrapper for the MOT_Sequence class to return multiple sequences."""
@@ -53,6 +53,45 @@ class MOT17Wrapper(Dataset):
     def __getitem__(self, idx: int):
         return self._data[idx]
 
+
+class FLIR_ADAS_V2_Wrapper(Dataset):
+    """A Wrapper for the flir_adas_v2_Sequence class to return multiple sequences."""
+
+    def __init__(self, split: str, dets: str, **kwargs) -> None:
+        """Initliazes all subset of the dataset.
+
+        Keyword arguments:
+        split -- the split of the dataset to use
+        kwargs -- kwargs for the MOT17Sequence dataset
+        """
+        train_sequences = [
+                    'video-BzZspxAweF8AnKhWK', 'video-FkqCGijjAKpABetZZ', 
+                    'video-PGdt7pJChnKoJDt35', 'video-RMxN6a4CcCeLGu4tA', 
+                    'video-YnfPeH8i2uBWmsSd2', 'video-dvZBYnphN2BwdMKBc', 
+                    'video-hnbGXq3nNPjBbc7CL']
+        test_sequences = ['video-msNEBxJE5PPDqenBM']
+
+        if split == "TRAIN":
+            sequences = train_sequences
+        elif split == "TEST":
+            sequences = test_sequences
+        elif split == "ALL":
+            sequences = train_sequences + test_sequences
+            sequences = sorted(sequences)
+        elif f"{split}" in train_sequences + test_sequences:
+            sequences = [f"{split}"]
+        else:
+            raise NotImplementedError("FLIR_ADAS_v2 split not available.")
+
+        self._data = []
+        for seq in sequences:
+            self._data.append(FLIR_ADAS_V2_Sequence(root_dir='/app/TMOT/data', seq_name=seq, **kwargs))
+
+    def __len__(self) -> int:
+        return len(self._data)
+
+    def __getitem__(self, idx: int):
+        return self._data[idx]
 
 class MOT20Wrapper(Dataset):
     """A Wrapper for the MOT_Sequence class to return multiple sequences."""

@@ -393,6 +393,9 @@ class DeformableTransformerDecoder(nn.Module):
         self.bbox_embed = None
         self.class_embed = None
 
+        # hs, inter_references = self.decoder(
+        # tgt, reference_points, memory, spatial_shapes,
+        # valid_ratios, query_embed, mask_flatten, query_attn_mask)
     def forward(self, tgt, reference_points, src, src_spatial_shapes, src_valid_ratios,
                 query_pos=None, src_padding_mask=None, query_attn_mask=None):
         output = tgt

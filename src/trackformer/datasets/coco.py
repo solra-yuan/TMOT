@@ -14,8 +14,11 @@ import torch.nn.functional as F
 import torch.utils.data
 import torchvision
 from pycocotools import mask as coco_mask
+print("_-------------------------------", __name__)
+print("package::::", __package__)
 
 from . import transforms as T
+
 
 
 class CocoDetection(torchvision.datasets.CocoDetection):
