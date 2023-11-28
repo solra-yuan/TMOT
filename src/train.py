@@ -37,6 +37,8 @@ ex.add_named_config('full_res', 'cfgs/train_full_res.yaml')
 ex.add_named_config('multi_frame', 'cfgs/train_multi_frame.yaml') #
 ex.add_named_config('flir_adas_v2', 'cfgs/train_flir_adas_v2_mot17_copy.yaml') # add custom config
 ex.add_named_config('flir_adas_v2_crowdhuman','cfgs/train_mot17_crowdhuman.yaml') 
+# # original training code of Trackformer crowdhuman pre-training
+
 # python src/train.py with \
 #     mot17 \
 #     deformable \
@@ -51,40 +53,52 @@ ex.add_named_config('flir_adas_v2_crowdhuman','cfgs/train_mot17_crowdhuman.yaml'
 #     epochs=20 \
 
 
-
-
+# # original training code of Trackformer crowdhuman pre-training(directory adapted)
 # python src/train.py with \
 #     mot17 \
 #     deformable \
 #     multi_frame \
 #     tracking \
 #     output_dir=models/mot17_crowdhuman_deformable_multi_frame \
-#     resume=/app/TMOT/models/trackformer_models_v1/mot17_crowdhuman_deformable_multi_frame/checkpoint_epoch_40.pth
+#     resume=/app/TMOT/models/trackformer_models_v1/mot17_crowdhuman_deformable_multi_frame/checkpoint_epoch_40.pth \
 #     mot_path_train=/app/TMOT/data/MOT17 \
 #     mot_path_val=/app/TMOT/data/MOT17 \
 #     train_split=mot17_train_coco
 #     val_split=mot17_train_cross_val_frame_0_5_to_1_0_coco
 
 
+# # custom data training
 # python src/train.py with \
 #     flir_adas_v2 \
 #     deformable \
 #     multi_frame \
 #     tracking \
 #     output_dir=models/flir_adas_v2_deformable_multi_frame \
-#     resume=/app/TMOT/models/trackformer_models_v1/r50_deformable_detr_plus_iterative_bbox_refinement-checkpoint_hidden_dim_288.pth
+#     resume=/app/TMOT/models/trackformer_models_v1/r50_deformable_detr_plus_iterative_bbox_refinement-checkpoint_hidden_dim_288.pth \
 #     train_split=train_coco \
 #     val_split=val_coco \
-#     epoch=20
+#     epochs=20
 
-
+# # test if mot training code work well without error(full data)
 # python src/train.py with \
 #     mot17 \
 #     deformable \
 #     multi_frame \
 #     tracking \
-#     output_dir=models/flir_adas_v2_deformable_multi_frame \
+#     output_dir=models/mot17_deformable_multi_frame_training_test \
 #     resume=/app/TMOT/models/trackformer_models_v1/r50_deformable_detr_plus_iterative_bbox_refinement-checkpoint_hidden_dim_288.pth
+
+# # test if mot training code work well without error(small mot17)
+# python src/train.py with \
+#     mot17 \
+#     deformable \
+#     multi_frame \
+#     tracking \
+#     output_dir=models/mot17_deformable_multi_frame_training_test_small \
+#     resume=/app/TMOT/models/r50_deformable_detr_plus_iterative_bbox_refinement-checkpoint_hidden_dim_288.pth \
+#     train_split=mot17_train_coco_small \
+#     val_split=mot17_train_cross_val_frame_0_5_to_1_0_coco_small \
+#     epochs=1 \
 
 
 

@@ -25,7 +25,8 @@ def build_model(args):
         # however choice of 20 classes is a bit arbitrary
         # num_classes = 1
     elif args.dataset in ['flir_adas_v2', 'flir_adas_v2_crowdhuman']:
-        num_classes = 10 # I suppose it's okay to set num_classes to 10 bc I have multiple categories.
+        num_classes = 20 # I suppose it's okay to set num_classes to 10 bc I have multiple categories.
+        # TODO : set classes to 10 <> load only 10 embed classes... hmm.. 
     else:
         raise NotImplementedError
 

@@ -68,8 +68,8 @@ class FLIR_ADAS_V2_Wrapper(Dataset):
                     'video-BzZspxAweF8AnKhWK', 'video-FkqCGijjAKpABetZZ', 
                     'video-PGdt7pJChnKoJDt35', 'video-RMxN6a4CcCeLGu4tA', 
                     'video-YnfPeH8i2uBWmsSd2', 'video-dvZBYnphN2BwdMKBc', 
-                    'video-hnbGXq3nNPjBbc7CL']
-        test_sequences = ['video-msNEBxJE5PPDqenBM']
+                    ]
+        test_sequences = ['video-hnbGXq3nNPjBbc7CL', 'video-msNEBxJE5PPDqenBM']
 
         if split == "TRAIN":
             sequences = train_sequences
@@ -85,7 +85,7 @@ class FLIR_ADAS_V2_Wrapper(Dataset):
 
         self._data = []
         for seq in sequences:
-            self._data.append(FLIR_ADAS_V2_Sequence(root_dir='/app/TMOT/data', seq_name=seq, **kwargs))
+            self._data.append(FLIR_ADAS_V2_Sequence(seq_name=seq, **kwargs))
 
     def __len__(self) -> int:
         return len(self._data)
