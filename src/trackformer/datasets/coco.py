@@ -309,7 +309,7 @@ def make_coco_transforms(image_set, img_transform=None, overflow_boxes=False):
             T.RandomResize([val_width], max_size=max_size),
         ]
     else:
-        ValueError(f'unknown {image_set}')
+        raise ValueError(f'unknown {image_set}')
 
     # transforms.append(normalize)
     return T.Compose(transforms), normalize
