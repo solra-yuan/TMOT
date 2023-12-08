@@ -2,13 +2,13 @@
 
 # Source files
 # ============
-*.pxd    text diff=python eol=cf
-*.py     text diff=python eol=cf
-*.py3    text diff=python eol=cf
-*.pyw    text diff=python eol=cf
-*.pyx    text diff=python eol=cf
-*.pyz    text diff=python eol=cf
-*.pyi    text diff=python eol=cf
+*.pxd    text diff=python eol=lf
+*.py     text diff=python eol=lf
+*.py3    text diff=python eol=lf
+*.pyw    text diff=python eol=lf
+*.pyx    text diff=python eol=lf
+*.pyz    text diff=python eol=lf
+*.pyi    text diff=python eol=lf
 
 # Binary files
 # ============
@@ -27,3 +27,20 @@
 # with the python modules ``pickle``, ``dbm.*``,
 # ``shelve``, ``marshal``, ``anydbm``, & ``bsddb``
 # (among others).
+
+*.css   text eol=lf
+*.html  text eol=lf
+*.js    text eol=lf
+*.json  text eol=lf
+*.less  text eol=lf
+*.md    text eol=lf
+*.yml   text eol=lf
+
+*.jpg binary
+*.gif binary
+*.png binary
+*.jpeg binary
+*.mp4 binary
+*.egg binary
+
+LICENSE text eol=lf
