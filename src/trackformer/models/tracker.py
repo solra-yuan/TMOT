@@ -435,9 +435,12 @@ class Tracker:
         if self.generate_attention_maps:
             new_det_attention_maps = new_det_attention_maps[new_det_keep]
 
+        detection_det_boxes = blob['dets'][0] if 'dets' in blob else torch.tensor([]) 
+        
         # public detection
         public_detections_mask = self.public_detections_mask(
-            new_det_boxes, blob['dets'][0])
+            new_det_boxes,
+            detection_det_boxes)
 
         new_det_boxes = new_det_boxes[public_detections_mask]
         new_det_scores = new_det_scores[public_detections_mask]

@@ -104,7 +104,7 @@ def main(seed, dataset_name, tracker_cfg,
     dataset = TrackDatasetFactory(
         dataset_name, root_dir=data_root_dir, img_transform=img_transform)
 
-    for seq in dataset:
+    for seq in dataset:        
         tracker.reset()
 
         _log.info("------------------")
