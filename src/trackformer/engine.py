@@ -84,6 +84,8 @@ def make_results(outputs, targets, postprocessors, tracking, return_only_orig=Tr
                 target['prev_target']['size'].unsqueeze(dim=0))[0].cpu()
 
             if 'track_query_match_ids' in target and len(target['track_query_match_ids']):
+                print("target['boxes']", target['boxes'], "device", target['boxes'].device)
+                print("target['track_query_match_ids']", target['track_query_match_ids'], target['track_query_match_ids'].device)
                 track_queries_iou, _ = box_iou(
                     target['boxes'][target['track_query_match_ids']],
                     result['boxes'])

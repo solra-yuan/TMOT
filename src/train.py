@@ -74,7 +74,7 @@ ex.add_named_config('flir_adas_v2_crowdhuman','cfgs/train_mot17_crowdhuman.yaml'
 #     multi_frame \
 #     tracking \
 #     output_dir=models/flir_adas_v2_deformable_multi_frame \
-#     resume=/app/TMOT/models/trackformer_models_v1/r50_deformable_detr_plus_iterative_bbox_refinement-checkpoint_hidden_dim_288.pth \
+#     resume=/app/TMOT/models/r50_deformable_detr_plus_iterative_bbox_refinement-checkpoint_hidden_dim_288.pth \
 #     train_split=train_coco \
 #     val_split=val_coco \
 #     epochs=20
@@ -117,7 +117,7 @@ def train(args: Namespace) -> None:
     if args.tracking:
         # assert args.batch_size == 1
         if args.dataset == 'flir_adas_v2':
-            args.tracking_eval = False  #todo : tracking evaluation code- look into factory.py
+            args.tracking_eval = True  #todo : tracking evaluation code- look into factory.py
         elif args.tracking_eval:
             assert 'mot' in args.dataset
 
