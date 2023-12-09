@@ -26,6 +26,7 @@ mm.lap.default_solver = 'lap'
 ex = sacred.Experiment('track', save_git_info=False)
 ex.add_config('/app/TMOT/cfgs/track.yaml')
 ex.add_named_config('reid', '/app/TMOT/cfgs/track_reid.yaml')
+ex.add_config('/app/TMOT/cfgs/train.yaml')
 
 
 @ex.automain
@@ -57,6 +58,8 @@ def main(seed, dataset_name, tracker_cfg,
             open(osp.join(output_dir, 'track.yaml'), 'w'),
             default_flow_style=False)
 
+
+
     ##########################
     # Initialize the modules #
     ##########################
@@ -67,6 +70,9 @@ def main(seed, dataset_name, tracker_cfg,
         obj_detect_args = nested_dict_to_namespace(yaml.unsafe_load(open(obj_detect_config_path)))
         img_transform = obj_detect_args.img_transform
         obj_detector, _, obj_detector_post = build_model(obj_detect_args)
+
+        # build visualizer
+        visualizers = build_visualizers(args, list(criterion.weight_dict.keys()))
 
         obj_detect_checkpoint = torch.load(
             obj_detect_checkpoint_file, map_location=lambda storage, loc: storage)
