@@ -36,6 +36,8 @@ ex.add_named_config('coco_person_masks', 'cfgs/train_coco_person_masks.yaml')
 ex.add_named_config('full_res', 'cfgs/train_full_res.yaml')
 ex.add_named_config('multi_frame', 'cfgs/train_multi_frame.yaml') #
 ex.add_named_config('flir_adas_v2', 'cfgs/train_flir_adas_v2_mot17_copy.yaml') # add custom config
+ex.add_named_config('flir_adas_v2_thermal', 'cfgs/train_flir_adas_v2_thermal_mot17_copy.yaml') # add custom config
+ex.add_named_config('flir_adas_v2_concat', 'cfgs/train_flir_adas_v2_concat_mot17_copy.yaml') #add custom confi
 ex.add_named_config('flir_adas_v2_crowdhuman','cfgs/train_mot17_crowdhuman.yaml') 
 # # original training code of Trackformer crowdhuman pre-training
 
@@ -98,6 +100,18 @@ ex.add_named_config('flir_adas_v2_crowdhuman','cfgs/train_mot17_crowdhuman.yaml'
 #     resume=/app/TMOT/models/r50_deformable_detr_plus_iterative_bbox_refinement-checkpoint_hidden_dim_288.pth \
 #     train_split=mot17_train_coco_small \
 #     val_split=mot17_train_cross_val_frame_0_5_to_1_0_coco_small \
+#     epochs=1 \
+
+# # test if mot training code work well without error(small flir_adas_v2)
+# python src/train.py with \
+#     flir_adas_v2 \
+#     deformable \
+#     multi_frame \
+#     tracking \
+#     output_dir=models/flir_adas_v2_small \
+#     resume=/app/TMOT/models/flir_adas_v2_deformable_multi_frame/checkpoint_epoch_20.pth \
+#     train_split=train_coco \
+#     val_split=val_coco \
 #     epochs=1 \
 
 

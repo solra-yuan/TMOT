@@ -215,7 +215,13 @@ class SetCriterion(nn.Module):
         targets dicts must contain the key "labels" containing a tensor of dim [nb_target_boxes]
         """
         assert 'pred_logits' in outputs
+        print("outputs shape:", outputs.shape, "targets shape:", targets.shape)
+        print("indices shape", indices.shape)
         src_logits = outputs['pred_logits']
+        print("src_logits shape", src_logits.shape)
+        print("src_logits", src_logits)
+        print("outputs", outputs)
+        print("targets", targets)
 
         idx = self._get_src_permutation_idx(indices)
         target_classes_o = torch.cat([t["labels"][J] for t, (_, J) in zip(targets, indices)])

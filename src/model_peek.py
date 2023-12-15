@@ -11,6 +11,7 @@ import torch
 import tqdm
 import yaml
 from torch.utils.data import DataLoader
+from visdom import Visdom
 
 from trackformer.datasets.tracking import TrackDatasetFactory
 from trackformer.models import build_model
@@ -24,9 +25,9 @@ start = time.time()
 mm.lap.default_solver = 'lap'
 
 ex = sacred.Experiment('track', save_git_info=False)
-ex.add_config('/app/TMOT/cfgs/track.yaml')
+ex.add_config('/app/TMOT/cfgs/track_flir_adas_v2.yaml')
 ex.add_named_config('reid', '/app/TMOT/cfgs/track_reid.yaml')
-ex.add_config('/app/TMOT/cfgs/train.yaml')
+# ex.add_config('/app/TMOT/cfgs/train.yaml')
 
 
 @ex.automain
@@ -66,13 +67,13 @@ def main(seed, dataset_name, tracker_cfg,
 
     # object detection
     if obj_detector_model is None:
-        obj_detect_config_path = '/app/TMOT/models/mot17_crowdhuman_deformable_multi_frame/config.yaml' ###
+        obj_detect_config_path = '/app/TMOT/models/flir_adas_v2_deformable_multi_frame/config.yaml' ###
         obj_detect_args = nested_dict_to_namespace(yaml.unsafe_load(open(obj_detect_config_path)))
         img_transform = obj_detect_args.img_transform
-        obj_detector, _, obj_detector_post = build_model(obj_detect_args)
+        obj_detector, criterion, obj_detector_post = build_model(obj_detect_args)
 
         # build visualizer
-        visualizers = build_visualizers(args, list(criterion.weight_dict.keys()))
+        vis = Visdom(env='flir_demo_main', port=8097, server='http://localhost')
 
         obj_detect_checkpoint = torch.load(
             obj_detect_checkpoint_file, map_location=lambda storage, loc: storage)
@@ -103,7 +104,7 @@ def main(seed, dataset_name, tracker_cfg,
     tracker = Tracker(
         obj_detector, obj_detector_post, tracker_cfg,
         generate_attention_maps, track_logger, verbose)
-
+    
     time_total = 0
     num_frames = 0
     mot_accums = []

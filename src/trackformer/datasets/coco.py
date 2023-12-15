@@ -274,6 +274,7 @@ def make_coco_transforms(image_set, img_transform=None, overflow_boxes=False):
         T.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
     ])
     # default
+    
     max_size = 1333
     val_width = 800
     scales = [480, 512, 544, 576, 608, 640, 672, 704, 736, 768, 800]
