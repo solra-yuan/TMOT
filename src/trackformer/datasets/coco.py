@@ -13,17 +13,22 @@ import torch
 import torch.nn.functional as F
 import torch.utils.data
 import torchvision
+
 from pycocotools import mask as coco_mask
+
+from solar_yuan_types import CocoAnnotationExtensions, RandomState
 
 from . import transforms as T
 
+from typing import Tuple
+from PIL import Image
 
 
 class CocoDetection(torchvision.datasets.CocoDetection):
 
     fields = ["labels", "area", "iscrowd", "boxes", "track_ids", "masks"]
 
-    def __init__(self,  img_folder, ann_file, transforms, norm_transforms,
+    def __init__(self,  img_folder, ann_file, transforms, norm_transforms: T.Compose,
                  return_masks=False, overflow_boxes=False, remove_no_obj_imgs=True,
                  prev_frame=False, prev_frame_rnd_augs=0.0, prev_prev_frame=False,
                  min_num_objects=0):
@@ -46,12 +51,17 @@ class CocoDetection(torchvision.datasets.CocoDetection):
         self._prev_frame_rnd_augs = prev_frame_rnd_augs
         self._prev_prev_frame = prev_prev_frame
 
-    def _getitem_from_id(self, image_id, random_state=None, random_jitter=True, concat_size_tuple=None):
+    def _getitem_from_id(
+            self, 
+            image_id: int, 
+            random_state: RandomState | None = None, 
+            random_jitter=True,
+            concat_size_tuple=None) -> Tuple[Image.Image, CocoAnnotationExtensions]:
         # if random state is given we do the data augmentation with the state
         # and then apply the random jitter. this ensures that (simulated) adjacent
         # frames have independent jitter.
         if random_state is not None:
-            curr_random_state = {
+            curr_random_state: RandomState = {
                 'random': random.getstate(),
                 'torch': torch.random.get_rng_state()}
             random.setstate(random_state['random'])
@@ -152,7 +162,7 @@ class CocoDetection(torchvision.datasets.CocoDetection):
 
     #     return img, target
 
-    def __getitem__(self, idx):
+    def __getitem__(self, idx: int):
         random_state = {
             'random': random.getstate(),
             'torch': torch.random.get_rng_state()}
@@ -161,14 +171,14 @@ class CocoDetection(torchvision.datasets.CocoDetection):
         if self._prev_frame:
             # PREV
             prev_img, prev_target = self._getitem_from_id(idx, random_state)
-            target[f'prev_image'] = prev_img
-            target[f'prev_target'] = prev_target
+            target['prev_image'] = prev_img
+            target['prev_target'] = prev_target
 
             if self._prev_prev_frame:
                 # PREV PREV
                 prev_prev_img, prev_prev_target = self._getitem_from_id(idx, random_state)
-                target[f'prev_prev_image'] = prev_prev_img
-                target[f'prev_prev_target'] = prev_prev_target
+                target['prev_prev_image'] = prev_prev_img
+                target['prev_prev_target'] = prev_prev_target
 
         return img, target
 
@@ -282,7 +292,7 @@ def make_coco_transforms(image_set, img_transform=None, overflow_boxes=False):
         T.Normalize([0.485, 0.456, 0.406], [0.229, 0.224, 0.225])
     ])
     # default
-    
+
     max_size = 1333
     val_width = 800
     scales = [480, 512, 544, 576, 608, 640, 672, 704, 736, 768, 800]
