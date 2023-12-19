@@ -79,7 +79,7 @@ class FLIR_ADAS_V2(CocoDetection):
 
             prev_img, prev_target = self._getitem_from_id(
                 prev_image_id, 
-                random_state
+                random_state,
                 concat_size_tuple=self.flir_concat_size_tuple
             )
 
@@ -95,7 +95,7 @@ class FLIR_ADAS_V2(CocoDetection):
 
                 prev_prev_img, prev_prev_target = self._getitem_from_id(
                     prev_prev_image_id, 
-                    random_state
+                    random_state,
                     concat_size_tuple=self.flir_concat_size_tuple
                 )
                 
@@ -201,7 +201,7 @@ class FLIR_ADAS_V2_thermal(CocoDetection):
 
             prev_img, prev_target = self._getitem_from_id(
                 prev_image_id, 
-                random_state
+                random_state,
                 concat_size_tuple=self.flir_concat_size_tuple
             )
             
