@@ -46,7 +46,7 @@ class CocoDetection(torchvision.datasets.CocoDetection):
         self._prev_frame_rnd_augs = prev_frame_rnd_augs
         self._prev_prev_frame = prev_prev_frame
 
-    def _getitem_from_id(self, image_id, random_state=None, random_jitter=True):
+    def _getitem_from_id(self, image_id, random_state=None, random_jitter=True, concat_size_tuple=None):
         # if random state is given we do the data augmentation with the state
         # and then apply the random jitter. this ensures that (simulated) adjacent
         # frames have independent jitter.
@@ -82,7 +82,13 @@ class CocoDetection(torchvision.datasets.CocoDetection):
 
         if random_jitter:
             img, target = self._add_random_jitter(img, target)
+        if concat_size_tuple is not None:
+            concat_size_w, concat_size_h = concat_size_tuple
+            img, target = T.resize(img, target, (concat_size_w, concat_size_h))
+
         img, target = self._norm_transforms(img, target)
+
+        
 
         return img, target
 
@@ -98,8 +104,10 @@ class CocoDetection(torchvision.datasets.CocoDetection):
 
             transform = T.RandomCrop((crop_height, crop_width))
             img, target = transform(img, target)
-
+        
             img, target = T.resize(img, target, (orig_w, orig_h))
+
+
 
         return img, target
 

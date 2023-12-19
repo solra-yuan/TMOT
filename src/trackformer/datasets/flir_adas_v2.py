@@ -18,10 +18,18 @@ from .coco import CocoDetection, make_coco_transforms
 
 class FLIR_ADAS_V2(CocoDetection):
 
-    def __init__(self, *args, prev_frame_range=1, **kwargs):
+    def __init__(self, *args, prev_frame_range=1, random_state_dict=None, flir_concat_size_tuple=None, **kwargs):
         super(FLIR_ADAS_V2, self).__init__(*args, **kwargs)
 
         self._prev_frame_range = prev_frame_range
+        if random_state_dict is not None:
+            self.random_state_dict = random_state_dict
+        else:
+            self.random_state_dict = None
+        if flir_concat_size_tuple:
+            self.flir_concat_size_tuple = flir_concat_size_tuple
+        else:
+            self.flir_concat_size_tuple = None
 
     @property
     def sequences(self):
@@ -41,11 +49,14 @@ class FLIR_ADAS_V2(CocoDetection):
         return 1.0 / self.seq_length(idx)
 
     def __getitem__(self, idx):
-        random_state = {
+        if self.random_state_dict is not None:
+            random_state = self.random_state_dict
+        else:
+            random_state = {
             'random': random.getstate(),
             'torch': torch.random.get_rng_state()}
 
-        img, target = self._getitem_from_id(idx, random_state, random_jitter=False)
+        img, target = self._getitem_from_id(idx, random_state, random_jitter=False, concat_size_tuple=self.flir_concat_size_tuple)
 
         if self._prev_frame:
             frame_id = self.coco.imgs[idx]['frame_id']
@@ -57,7 +68,8 @@ class FLIR_ADAS_V2(CocoDetection):
                 min(frame_id + self._prev_frame_range, self.seq_length(idx) - 1))
             prev_image_id = self.coco.imgs[idx]['first_frame_image_id'] + prev_frame_id
 
-            prev_img, prev_target = self._getitem_from_id(prev_image_id, random_state)
+                            
+            prev_img, prev_target = self._getitem_from_id(prev_image_id, random_state, concat_size_tuple=self.flir_concat_size_tuple)
             target[f'prev_image'] = prev_img
             target[f'prev_target'] = prev_target
 
@@ -66,7 +78,7 @@ class FLIR_ADAS_V2(CocoDetection):
                 prev_prev_frame_id = min(max(0, prev_frame_id + prev_frame_id - frame_id), self.seq_length(idx) - 1)
                 prev_prev_image_id = self.coco.imgs[idx]['first_frame_image_id'] + prev_prev_frame_id
 
-                prev_prev_img, prev_prev_target = self._getitem_from_id(prev_prev_image_id, random_state)
+                prev_prev_img, prev_prev_target = self._getitem_from_id(prev_prev_image_id, random_state, concat_size_tuple=self.flir_concat_size_tuple)
                 target[f'prev_prev_image'] = prev_prev_img
                 target[f'prev_prev_target'] = prev_prev_target
 
@@ -112,10 +124,19 @@ class FLIR_ADAS_V2(CocoDetection):
 
 class FLIR_ADAS_V2_thermal(CocoDetection):
 
-    def __init__(self, *args, prev_frame_range=1, **kwargs):
+    def __init__(self, *args, prev_frame_range=1, random_state_dict=None, flir_concat_size_tuple=None, **kwargs):
         super(FLIR_ADAS_V2_thermal, self).__init__(*args, **kwargs)
 
         self._prev_frame_range = prev_frame_range
+        if random_state_dict is not None:
+            self.random_state_dict = random_state_dict
+        else:
+            self.random_state_dict = None
+
+        if flir_concat_size_tuple:
+            self.flir_concat_size_tuple = flir_concat_size_tuple
+        else:
+            self.flir_concat_size_tuple = None
 
     @property
     def sequences(self):
@@ -135,11 +156,14 @@ class FLIR_ADAS_V2_thermal(CocoDetection):
         return 1.0 / self.seq_length(idx)
 
     def __getitem__(self, idx):
-        random_state = {
+        if self.random_state_dict is not None:
+            random_state = self.random_state_dict
+        else:
+            random_state = {
             'random': random.getstate(),
             'torch': torch.random.get_rng_state()}
 
-        img, target = self._getitem_from_id(idx, random_state, random_jitter=False)
+        img, target = self._getitem_from_id(idx, random_state, random_jitter=False, concat_size_tuple=self.flir_concat_size_tuple)
 
         if self._prev_frame:
             frame_id = self.coco.imgs[idx]['frame_id']
@@ -151,7 +175,7 @@ class FLIR_ADAS_V2_thermal(CocoDetection):
                 min(frame_id + self._prev_frame_range, self.seq_length(idx) - 1))
             prev_image_id = self.coco.imgs[idx]['first_frame_image_id'] + prev_frame_id
 
-            prev_img, prev_target = self._getitem_from_id(prev_image_id, random_state)
+            prev_img, prev_target = self._getitem_from_id(prev_image_id, random_state, concat_size_tuple=self.flir_concat_size_tuple)
             target[f'prev_image'] = prev_img
             target[f'prev_target'] = prev_target
 
@@ -160,7 +184,7 @@ class FLIR_ADAS_V2_thermal(CocoDetection):
                 prev_prev_frame_id = min(max(0, prev_frame_id + prev_frame_id - frame_id), self.seq_length(idx) - 1)
                 prev_prev_image_id = self.coco.imgs[idx]['first_frame_image_id'] + prev_prev_frame_id
 
-                prev_prev_img, prev_prev_target = self._getitem_from_id(prev_prev_image_id, random_state)
+                prev_prev_img, prev_prev_target = self._getitem_from_id(prev_prev_image_id, random_state, concat_size_tuple=self.flir_concat_size_tuple)
                 target[f'prev_prev_image'] = prev_prev_img
                 target[f'prev_prev_target'] = prev_prev_target
 
@@ -223,14 +247,14 @@ class FLIR_ADAS_V2_concat(Dataset):
         img1, target1 = self.dataset1[idx]
         img2, target2 = self.dataset2[idx]
         
-        shared_transform = T.Resize([512, 640])
+        # shared_transform = T.Resize([512, 640])
 
-        img1 = shared_transform(img1)
-        img2 = shared_transform(img2)
+        # img1 = shared_transform(img1)
+        # img2 = shared_transform(img2)
         concatenated_img = torch.cat([img1, img2], dim=0)
         #concatenated_target = torch.cat([target1, target2])
 
-        return concatenated_img, target1
+        return concatenated_img, target1, target2
         #return concatenated_img, concatenated_target
 
 
@@ -366,6 +390,8 @@ def build_flir_adas_v2(image_set, args):
     # transform
     transforms, norm_transforms = make_coco_transforms(
         image_set, args.img_transform, args.overflow_boxes)
+    if args.bbox_testing:
+        transforms = None
     # return flir_adas_v2 dataset
     dataset = FLIR_ADAS_V2(
         img_folder, ann_file, transforms, norm_transforms,
@@ -404,10 +430,17 @@ def build_flir_adas_v2_concat(image_set, args):
     # argument에 따른 transform 지정 
     transforms, norm_transforms = make_coco_transforms(
         image_set, args.img_transform, args.overflow_boxes)  # transform before dataset
+    flir_concat_random_state_dict = {
+                'random': random.getstate(),
+                'torch': torch.random.get_rng_state()}
+    flir_rgb_t_concat_size_tuple = (640, 512)
+    
     # FLIR_ADAS_V2 데이터셋 만들기
     dataset1 = FLIR_ADAS_V2(
         img_folder, ann_file, transforms, norm_transforms,
         prev_frame_range=prev_frame_range,
+        random_state_dict = flir_concat_random_state_dict,
+        flir_concat_size_tuple = flir_rgb_t_concat_size_tuple,
         return_masks=args.masks,
         overflow_boxes=args.overflow_boxes,
         remove_no_obj_imgs=False,
@@ -428,6 +461,8 @@ def build_flir_adas_v2_concat(image_set, args):
     dataset2 = FLIR_ADAS_V2_thermal(
         img_folder, ann_file, transforms, norm_transforms,
         prev_frame_range=prev_frame_range,
+        random_state_dict = flir_concat_random_state_dict,
+        flir_concat_size_tuple = flir_rgb_t_concat_size_tuple,
         return_masks=args.masks,
         overflow_boxes=args.overflow_boxes,
         remove_no_obj_imgs=False,
