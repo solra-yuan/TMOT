@@ -143,7 +143,8 @@ def plot_sequence(tracks, data_loader, output_dir, write_images, generate_attent
     mx = 0
     for track_id, track_data in tracks.items():
         mx = max(mx, track_id)
-    cmap = rand_cmap(mx, type='bright', first_color_black=False, last_color_black=False)
+    cmap = rand_cmap(mx, type='bright', first_color_black=False, last_color_black=False, verbose=True)
+    # turned verbose option=True only for debugging
 
     # if generate_attention_maps:
     #     attention_maps_per_track = {

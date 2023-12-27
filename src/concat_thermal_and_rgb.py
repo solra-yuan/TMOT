@@ -41,8 +41,8 @@ from matplotlib.patches import Rectangle
 def my_main(config):
     print(config)
     args = nested_dict_to_namespace(config)
-    args.flir_adas_v2_path_train = '../data/flir_adas_v2'
-    args.flir_adas_v2_path_val = '../data/flir_adas_v2'
+    args.flir_adas_v2_path_train = './data/flir_adas_v2'
+    args.flir_adas_v2_path_val = './data/flir_adas_v2'
     utils.init_distributed_mode(args)
 
     # load imgs & annotations for debugging purpose
@@ -96,7 +96,7 @@ def my_main(config):
                 print("img_previdx size", img_previdx.shape)
                 test_prev_img_rgb = ax[k][2].imshow(img_previdx[0:3, :, :].permute(1,2,0))
                 test_prev_img_t = ax[k][3].imshow(img_previdx[3:4, :, :].permute(1,2,0))
-            ax[k,0].imshow(img.tensors[k,0:3,:,:].permute(1,2,0))
+            ax[k][0].imshow(img.tensors[k,0:3,:,:].permute(1,2,0))
             t_channel_one = img.tensors[k, 3:4, :, :].permute(1,2,0)
             t_channel_two = img.tensors[k, 4:5, :, :].permute(1,2,0)
             t_channel_three = img.tensors[k, 5:6, :, :].permute(1,2,0)
@@ -112,7 +112,7 @@ def my_main(config):
                     c = 'r'
                 elif l==1:
                     c = 'y'
-                rect = Rectangle((float(r[0]*640), float(r[1]*512)), float(r[2]*640), float(r[3]*512), linewidth=1, edgecolor=c, facecolor='none')
+                rect = Rectangle((float((r[0]-r[2]/2)*640), float((r[1]-r[3]/2)*512)), float((r[2])*640), float((r[3])*512), linewidth=1, edgecolor=c, facecolor='none')
                 ax[l][0].add_patch(rect)
         for j in range(2):
             for r in target_t[j]['boxes']:
@@ -121,7 +121,7 @@ def my_main(config):
                     c = 'b'
                 elif j==1:
                     c = 'g'
-                rect = Rectangle((float(r[0]*640), float(r[1]*512)), float(r[2]*640), float(r[3]*512), linewidth=1, edgecolor=c, facecolor='none')
+                rect = Rectangle((float((r[0]-r[2]/2)*640), float((r[1]-r[3]/2)*512)), float((r[2])*640), float((r[3])*512), linewidth=1, edgecolor=c, facecolor='none')
                 ax[j][1].add_patch(rect)
         for s in range(2):
             print('type of target_t[0]["prev_image"]', type(target_t[s]['prev_image']))

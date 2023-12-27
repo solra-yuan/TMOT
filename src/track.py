@@ -133,7 +133,7 @@ def main(seed, dataset_name, obj_detect_checkpoint_file, tracker_cfg,
                 with torch.no_grad():
                     tracker.step(frame_data)
 
-            results = tracker.get_results()
+            results = tracker.get_results() # 입력 주는 법을 찾아야됨
 
             time_total += time.time() - start
 

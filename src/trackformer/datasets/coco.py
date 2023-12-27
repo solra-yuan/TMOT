@@ -98,7 +98,7 @@ class CocoDetection(torchvision.datasets.CocoDetection):
 
         img, target = self._norm_transforms(img, target)
 
-        
+
 
         return img, target
 
