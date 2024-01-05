@@ -445,8 +445,6 @@ def build_flir_adas_v2(image_set, args):
     # transform
     transforms, norm_transforms = make_coco_transforms(
         image_set, args.img_transform, args.overflow_boxes)
-    if args.bbox_testing:
-        transforms = None
     # return flir_adas_v2 dataset
     dataset = FLIR_ADAS_V2(
         img_folder, ann_file, transforms, norm_transforms,

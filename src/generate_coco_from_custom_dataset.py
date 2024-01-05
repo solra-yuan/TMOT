@@ -23,8 +23,8 @@ from trackformer.datasets.tracking.mots20_sequence import load_mots_gt
 CUSTOM_ROOT = '/app/TMOT/data/flir_adas_v2/'
 VIS_THRESHOLD = 0.25
 
-FLIR_ADAS_V2 = False
-FLIR_ADAS_V2_thermal = True
+FLIR_ADAS_V2 = True
+FLIR_ADAS_V2_thermal = False
 
 # add custom sequence info here
 if FLIR_ADAS_V2:
@@ -257,23 +257,24 @@ def generate_coco_from_custom(split_name='train', seqs_names=None,
                 if image_id is None:
                     continue
 
-                annotation = {
-                    "id" : annotation_id,
-                    "bbox":annot['bbox'],
-                    "image_id": image_id,
-                    "segmentation": annot['segmentation'],
-                    "ignore": 0 if annot['category_id'] else 1,
-                    "visibility": 1.0,
-                    "area": annot['area'],
-                    "iscrowd": 1 if annot['iscrowd'] else 0,
-                    "seq": image_seq,
-                    "category_id": coco_orig_category_id_to_sorted_order_dict[annot['category_id']],
-                    "track_id": annot['track_id']+1 if 'track_id' in annot else -1  # track_id는 1부터 시작함
-                }
-                if annotation['track_id'] == -1:
+                if 'track_id' in annot:
+                    annotation = {
+                        "id" : annotation_id,
+                        "bbox":annot['bbox'],
+                        "image_id": image_id,
+                        "segmentation": annot['segmentation'],
+                        "ignore": 0 if annot['category_id'] else 1,
+                        "visibility": 1.0,
+                        "area": annot['area'],
+                        "iscrowd": 1 if annot['iscrowd'] else 0,
+                        "seq": image_seq,
+                        "category_id": coco_orig_category_id_to_sorted_order_dict[annot['category_id']],
+                        "track_id": annot['track_id']+1} # track_id는 1부터 시작함
+                else:     
                     nan_track_id_count += 1
                     print("track id is nan!", nan_track_id_count)
                     print("track id == nan annotation", annotation)
+                    continue
                 
                 seq_annotations.append(annotation)
                 annotation_id += 1
@@ -335,6 +336,11 @@ if __name__ == '__main__':
                                 frame_range=None, 
                                 data_root=CUSTOM_ROOT,
                                 )
+        generate_coco_from_custom(split_name='all_coco', seqs_names=train_sequences+val_sequences+test_sequences,
+                                root_split='train', flir_adas_v2=True, 
+                                frame_range=None, 
+                                data_root=CUSTOM_ROOT,
+                                )        
     elif FLIR_ADAS_V2_thermal:
         """
         {
@@ -373,3 +379,8 @@ if __name__ == '__main__':
                                 frame_range=None, 
                                 data_root=CUSTOM_ROOT,
                                 )
+        generate_coco_from_custom(split_name='all_coco_t', seqs_names=train_sequences+val_sequences+test_sequences,
+                                root_split='train_t', flir_adas_v2_thermal=True, 
+                                frame_range=None, 
+                                data_root=CUSTOM_ROOT,
+                                )        

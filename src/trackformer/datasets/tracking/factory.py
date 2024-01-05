@@ -76,10 +76,11 @@ class TrackDatasetFactory:
             if self._data is None:
                 self._data = DATASETS[dataset](kwargs)
             else:
-                self._data = ConcatDataset([self._data, DATASETS[dataset](kwargs)])
+                self._data = ConcatDataset([self._data, DATASETS[dataset](kwargs)])            
 
     def __len__(self) -> int:
         return len(self._data)
 
     def __getitem__(self, idx: int):
+        print()
         return self._data[idx]
