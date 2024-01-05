@@ -291,9 +291,10 @@ def evaluate(model, criterion, postprocessors, data_loader, device,
         # distribute evaluation of seqs to processes
         seqs = data_loader.dataset.sequences
         seqs_per_rank = {i: [] for i in range(utils.get_world_size())}
+        
         for i, seq in enumerate(seqs):
             rank = i % utils.get_world_size()
-                                          
+            seqs_per_rank[rank].append(seq)                              
 
         # only evaluate one seq in debug mode
         if args.debug:

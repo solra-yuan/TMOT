@@ -82,5 +82,4 @@ class TrackDatasetFactory:
         return len(self._data)
 
     def __getitem__(self, idx: int):
-        print()
         return self._data[idx]
