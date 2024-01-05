@@ -436,7 +436,7 @@ def build_flir_adas_v2(image_set, args):
     else:
         ValueError(f'unknown {image_set}')
 
-    assert root.exists(), f'provided flir_adas_v2 Det path {root} does not exist'
+    assert root.exists(), f'provided flir_adas_v2 path {root} does not exist'
     # read split attribute
     split = getattr(args, f"{image_set}_split")
     # locate img folder and annotation file
