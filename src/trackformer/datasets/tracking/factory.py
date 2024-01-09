@@ -7,7 +7,7 @@ from typing import Union
 from torch.utils.data import ConcatDataset
 
 from .demo_sequence import DemoSequence
-from .mot_wrapper import MOT17Wrapper, MOT20Wrapper, MOTS20Wrapper
+from .mot_wrapper import MOT17Wrapper, MOT20Wrapper, MOTS20Wrapper, FLIR_ADAS_V2_Wrapper
 
 DATASETS = {}
 
@@ -23,7 +23,7 @@ for split in ['TRAIN', 'TEST', 'ALL', '01', '02', '03', '04', '05',
 
 # custom data
 # split을 어디서 받아오는지 볼 것. TRAIN, TEST, ALL을 어디서 주는거임?
-for split in ['TRAIN', 'TEST', 'ALL',
+for split in ['TRAIN', 'TEST', 'flir_adas_v2',
               'video-BzZspxAweF8AnKhWK', 
               'video-FkqCGijjAKpABetZZ', 
               'video-PGdt7pJChnKoJDt35', 
@@ -34,7 +34,7 @@ for split in ['TRAIN', 'TEST', 'ALL',
               'video-msNEBxJE5PPDqenBM']:
     name = f"{split}"
     DATASETS[name] = (
-        lambda kwargs, split=split: MOT17Wrapper(split, **kwargs))
+        lambda kwargs, split=split: FLIR_ADAS_V2_Wrapper(split, dets=None, **kwargs))
 
 for split in ['TRAIN', 'TEST', 'ALL', '01', '02', '03', '04', '05',
               '06', '07', '08']:
@@ -76,7 +76,7 @@ class TrackDatasetFactory:
             if self._data is None:
                 self._data = DATASETS[dataset](kwargs)
             else:
-                self._data = ConcatDataset([self._data, DATASETS[dataset](kwargs)])
+                self._data = ConcatDataset([self._data, DATASETS[dataset](kwargs)])            
 
     def __len__(self) -> int:
         return len(self._data)

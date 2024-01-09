@@ -2,14 +2,14 @@ output_dir: null
 verbose: false
 seed: 666
 
-obj_detect_checkpoint_file: models/mot17_crowdhuman_deformable_multi_frame/checkpoint_epoch_40.pth
+obj_detect_checkpoint_file: /app/TMOT/models/flir_adas_v2_deformable_multi_frame/checkpoint_epoch_20.pth
 
 interpolate: False
 # if available load tracking results and only evaluate
 load_results_dir: null
 
 # dataset (look into src/datasets/tracking/factory.py)
-dataset_name: MOT17-ALL-ALL
+dataset_name: flir_adas_v2
 data_root_dir: data
 
 # [False, 'debug', 'pretty']

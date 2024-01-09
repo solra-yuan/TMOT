@@ -24,20 +24,56 @@ CUSTOM_ROOT = '/app/TMOT/data/flir_adas_v2/'
 VIS_THRESHOLD = 0.25
 
 FLIR_ADAS_V2 = True
+FLIR_ADAS_V2_thermal = False
 
-CUSTOM_SEQS_INFO = {
-    'video-BzZspxAweF8AnKhWK': {'img_width': 1024, 'img_height': 1224, 'seq_length': 338}, 
-    'video-FkqCGijjAKpABetZZ': {'img_width': 1024, 'img_height': 1224, 'seq_length': 226}, 
-    'video-PGdt7pJChnKoJDt35': {'img_width': 1024, 'img_height': 1224, 'seq_length': 208}, 
-    'video-RMxN6a4CcCeLGu4tA': {'img_width': 768, 'img_height': 1024, 'seq_length': 1033}, 
-    'video-YnfPeH8i2uBWmsSd2': {'img_width': 1024, 'img_height': 1224, 'seq_length': 540}, 
-    'video-dvZBYnphN2BwdMKBc': {'img_width': 768, 'img_height': 1024, 'seq_length': 565}, 
-    'video-hnbGXq3nNPjBbc7CL': {'img_width': 1024, 'img_height': 1224, 'seq_length': 411}, 
-    'video-msNEBxJE5PPDqenBM': {'img_width': 1024, 'img_height': 1224, 'seq_length': 428}}
+# add custom sequence info here
+if FLIR_ADAS_V2:
+    CUSTOM_SEQS_INFO = {
+        'video-BzZspxAweF8AnKhWK': {'img_width': 1024, 'img_height': 1224, 'seq_length': 338}, 
+        'video-FkqCGijjAKpABetZZ': {'img_width': 1024, 'img_height': 1224, 'seq_length': 226}, 
+        'video-PGdt7pJChnKoJDt35': {'img_width': 1024, 'img_height': 1224, 'seq_length': 208}, 
+        'video-RMxN6a4CcCeLGu4tA': {'img_width': 768, 'img_height': 1024, 'seq_length': 1033}, 
+        'video-YnfPeH8i2uBWmsSd2': {'img_width': 1024, 'img_height': 1224, 'seq_length': 540}, 
+        'video-dvZBYnphN2BwdMKBc': {'img_width': 768, 'img_height': 1024, 'seq_length': 565}, 
+        'video-hnbGXq3nNPjBbc7CL': {'img_width': 1024, 'img_height': 1224, 'seq_length': 411}, 
+        'video-msNEBxJE5PPDqenBM': {'img_width': 1024, 'img_height': 1224, 'seq_length': 428}
+        }
+elif FLIR_ADAS_V2_thermal:
+    CUSTOM_SEQS_INFO = {
+        'video-4FRnNpmSmwktFJKjg': {'img_width': 512, 'img_height': 640, 'seq_length': 338}, 
+        'video-5RSrbWYu9eokv5bvR': {'img_width': 512, 'img_height': 640, 'seq_length': 411}, 
+        'video-6tLtjdkv5K5BuhB37': {'img_width': 512, 'img_height': 640, 'seq_length': 226}, 
+        'video-SCiKdG3MqZfiE292B': {'img_width': 512, 'img_height': 640, 'seq_length': 428}, 
+        'video-ZAtDSNuZZjkZFvMAo': {'img_width': 512, 'img_height': 640, 'seq_length': 1033}, 
+        'video-ePoikf5LyTTfqchga': {'img_width': 512, 'img_height': 640, 'seq_length': 540}, 
+        'video-t3f7QC8hZr6zYXpEZ': {'img_width': 512, 'img_height': 640, 'seq_length': 565}, 
+        'video-vbrSzr4vFTm5QwuGH': {'img_width': 512, 'img_height': 640, 'seq_length': 208}
+    }
+    # CUSTOM_SEQS_INFO = {
+    #     'video-BzZspxAweF8AnKhWK': {'img_width': 1024, 'img_height': 1224, 'seq_length': 338}, 
+    #     'video-FkqCGijjAKpABetZZ': {'img_width': 1024, 'img_height': 1224, 'seq_length': 226}, 
+    #     'video-PGdt7pJChnKoJDt35': {'img_width': 1024, 'img_height': 1224, 'seq_length': 208}, 
+    #     'video-RMxN6a4CcCeLGu4tA': {'img_width': 768, 'img_height': 1024, 'seq_length': 1033}, 
+    #     'video-YnfPeH8i2uBWmsSd2': {'img_width': 1024, 'img_height': 1224, 'seq_length': 540}, 
+    #     'video-dvZBYnphN2BwdMKBc': {'img_width': 768, 'img_height': 1024, 'seq_length': 565}, 
+    #     'video-hnbGXq3nNPjBbc7CL': {'img_width': 1024, 'img_height': 1224, 'seq_length': 411}, 
+    #     'video-msNEBxJE5PPDqenBM': {'img_width': 1024, 'img_height': 1224, 'seq_length': 428}
+    #     }
+
+    # thermal_seq_to_rgb_seq = {}
+    rgb_seq_to_thermal_seq = {'video-BzZspxAweF8AnKhWK': 'video-4FRnNpmSmwktFJKjg',
+                              'video-FkqCGijjAKpABetZZ': 'video-6tLtjdkv5K5BuhB37',
+                              'video-PGdt7pJChnKoJDt35': 'video-vbrSzr4vFTm5QwuGH',
+                              'video-RMxN6a4CcCeLGu4tA': 'video-ZAtDSNuZZjkZFvMAo',
+                              'video-YnfPeH8i2uBWmsSd2': 'video-ePoikf5LyTTfqchga',
+                              'video-dvZBYnphN2BwdMKBc': 'video-t3f7QC8hZr6zYXpEZ',
+                              'video-hnbGXq3nNPjBbc7CL': 'video-5RSrbWYu9eokv5bvR',
+                              'video-msNEBxJE5PPDqenBM': 'video-SCiKdG3MqZfiE292B'}
+
 
 
 def generate_coco_from_custom(split_name='train', seqs_names=None,
-                           root_split='train', flir_adas_v2=False,
+                           root_split='train', flir_adas_v2=False, flir_adas_v2_thermal=False,
                            frame_range=None, data_root='data/flir_adas_v2'):
     """
     Generates COCO data from CUSTOM DATA.
@@ -48,8 +84,12 @@ def generate_coco_from_custom(split_name='train', seqs_names=None,
 
     if flir_adas_v2:
         data_root = CUSTOM_ROOT
+    elif flir_adas_v2_thermal:
+        data_root = CUSTOM_ROOT
+
     root_split_path = os.path.join(data_root, root_split)
-    root_split_custom_path = os.path.join(CUSTOM_ROOT, root_split)
+    if flir_adas_v2_thermal:
+        root_split_path = os.path.join(data_root, root_split.split('_')[0])
     coco_dir = os.path.join(data_root, split_name)
 
     if os.path.isdir(coco_dir):
@@ -103,8 +143,12 @@ def generate_coco_from_custom(split_name='train', seqs_names=None,
     img_id = 0  # 모든 시퀀스 대해 통합된 image id임
 
     print("root_split_path", root_split_path)
+    # seqs : root_split_path에서 정렬된 이름.
     seqs = sorted(os.listdir(root_split_path))
-
+    if flir_adas_v2_thermal:
+        seqs = [rgb_seq_to_thermal_seq[se] for se in seqs]
+        root_split_path = os.path.join(data_root, root_split)
+        print("root_split_path, thermal:", root_split_path)
     if seqs_names is not None:
         seqs = [s for s in seqs if s in seqs_names]
     annotations['sequences'] = seqs
@@ -165,6 +209,11 @@ def generate_coco_from_custom(split_name='train', seqs_names=None,
             Path(root_split_path).parents[0], 
             'coco_gt', 
             'coco.json')
+    if flir_adas_v2_thermal:
+        gt_file_path = os.path.join(
+            Path(root_split_path).parents[0], 
+            'coco_gt_t', 
+            'coco.json')
     nan_track_id_count = 0
     for seq in seqs:       
         if not os.path.isfile(gt_file_path):
@@ -172,7 +221,7 @@ def generate_coco_from_custom(split_name='train', seqs_names=None,
         
         seq_annotations = []
 
-        if flir_adas_v2:
+        if flir_adas_v2 or flir_adas_v2_thermal:
             with open(gt_file_path, "r") as gt_file:
                 annot_json_data = json.load(gt_file)
 
@@ -203,24 +252,29 @@ def generate_coco_from_custom(split_name='train', seqs_names=None,
                     print("annot['image_id']: ",annot['image_id'])
                     print("orig_image_id_to_image_name[annot['image_id]]: ",orig_image_id_to_image_name[annot['image_id']] )
                     print_first = False
+                
+                image_id = orig_image_name_to_parsed_image_id.get(image_name[5:], None)
+                if image_id is None:
+                    continue
 
-                annotation = {
-                    "id" : annotation_id,
-                    "bbox":annot['bbox'],
-                    "image_id": orig_image_name_to_parsed_image_id[image_name[5:]],
-                    "segmentation": annot['segmentation'],
-                    "ignore": 0 if annot['category_id'] else 1,
-                    "visibility": 1.0,
-                    "area": annot['area'],
-                    "iscrowd": 1 if annot['iscrowd'] else 0,
-                    "seq": image_seq,
-                    "category_id": coco_orig_category_id_to_sorted_order_dict[annot['category_id']],
-                    "track_id": annot['track_id']+1 if 'track_id' in annot else -1  # track_id는 1부터 시작함
-                }
-                if annotation['track_id'] == -1:
+                if 'track_id' in annot:
+                    annotation = {
+                        "id" : annotation_id,
+                        "bbox":annot['bbox'],
+                        "image_id": image_id,
+                        "segmentation": annot['segmentation'],
+                        "ignore": 0 if annot['category_id'] else 1,
+                        "visibility": 1.0,
+                        "area": annot['area'],
+                        "iscrowd": 1 if annot['iscrowd'] else 0,
+                        "seq": image_seq,
+                        "category_id": coco_orig_category_id_to_sorted_order_dict[annot['category_id']],
+                        "track_id": annot['track_id']+1} # track_id는 1부터 시작함
+                else:     
                     nan_track_id_count += 1
                     print("track id is nan!", nan_track_id_count)
                     print("track id == nan annotation", annotation)
+                    continue
                 
                 seq_annotations.append(annotation)
                 annotation_id += 1
@@ -247,36 +301,86 @@ if __name__ == '__main__':
     # generate_coco_from_custom(split_name='train_custom_testing', seqs_names=None,
     #                       root_split='train', flir_adas_v2=True,
     #                       data_root='data/flir_adas_v2')
-    """
-    {'video-BzZspxAweF8AnKhWK': {'img_width': 1024, 'img_height': 1224, 'seq_length': 338}, 
-    'video-FkqCGijjAKpABetZZ': {'img_width': 1024, 'img_height': 1224, 'seq_length': 226}, 
-    'video-PGdt7pJChnKoJDt35': {'img_width': 1024, 'img_height': 1224, 'seq_length': 208}, 
-    'video-RMxN6a4CcCeLGu4tA': {'img_width': 768, 'img_height': 1024, 'seq_length': 1033}, 
-    'video-YnfPeH8i2uBWmsSd2': {'img_width': 1024, 'img_height': 1224, 'seq_length': 540}, 
-    'video-dvZBYnphN2BwdMKBc': {'img_width': 768, 'img_height': 1024, 'seq_length': 565}, 
-    'video-hnbGXq3nNPjBbc7CL': {'img_width': 1024, 'img_height': 1224, 'seq_length': 411}, 
-    'video-msNEBxJE5PPDqenBM': {'img_width': 1024, 'img_height': 1224, 'seq_length': 428}}
-    """
-    train_sequences = ['video-BzZspxAweF8AnKhWK', 
-                       'video-FkqCGijjAKpABetZZ', 
-                       'video-PGdt7pJChnKoJDt35']
-    val_sequences = ['video-RMxN6a4CcCeLGu4tA',
-                     'video-YnfPeH8i2uBWmsSd2',
-                     'video-dvZBYnphN2BwdMKBc',]
-    test_sequences = ['video-hnbGXq3nNPjBbc7CL',
-                      'video-msNEBxJE5PPDqenBM']
-    generate_coco_from_custom(split_name='train_coco', seqs_names=train_sequences,
-                              root_split='train', flir_adas_v2=True, 
-                              frame_range=None, 
-                              data_root=CUSTOM_ROOT,
-                              )
-    generate_coco_from_custom(split_name='val_coco', seqs_names=val_sequences,
-                              root_split='train', flir_adas_v2=True, 
-                              frame_range=None, 
-                              data_root=CUSTOM_ROOT,
-                              )
-    generate_coco_from_custom(split_name='test_coco', seqs_names=test_sequences,
-                              root_split='train', flir_adas_v2=True, 
-                              frame_range=None, 
-                              data_root=CUSTOM_ROOT,
-                              )
+    if FLIR_ADAS_V2:
+        """
+        {'video-BzZspxAweF8AnKhWK': {'img_width': 1024, 'img_height': 1224, 'seq_length': 338}, # train
+        'video-FkqCGijjAKpABetZZ': {'img_width': 1024, 'img_height': 1224, 'seq_length': 226}, # train
+        'video-PGdt7pJChnKoJDt35': {'img_width': 1024, 'img_height': 1224, 'seq_length': 208}, # train
+        'video-RMxN6a4CcCeLGu4tA': {'img_width': 768, 'img_height': 1024, 'seq_length': 1033}, # val
+        'video-YnfPeH8i2uBWmsSd2': {'img_width': 1024, 'img_height': 1224, 'seq_length': 540}, # val
+        'video-dvZBYnphN2BwdMKBc': {'img_width': 768, 'img_height': 1024, 'seq_length': 565}, # val
+        'video-hnbGXq3nNPjBbc7CL': {'img_width': 1024, 'img_height': 1224, 'seq_length': 411}, # test
+        'video-msNEBxJE5PPDqenBM': {'img_width': 1024, 'img_height': 1224, 'seq_length': 428}} # test
+        """
+        train_sequences = ['video-BzZspxAweF8AnKhWK', 
+                        'video-FkqCGijjAKpABetZZ', 
+                        'video-PGdt7pJChnKoJDt35',
+                        'video-RMxN6a4CcCeLGu4tA']
+        val_sequences = [
+                        'video-YnfPeH8i2uBWmsSd2',
+                        'video-dvZBYnphN2BwdMKBc',]
+        test_sequences = ['video-hnbGXq3nNPjBbc7CL',
+                        'video-msNEBxJE5PPDqenBM']
+        generate_coco_from_custom(split_name='train_coco', seqs_names=train_sequences,
+                                root_split='train', flir_adas_v2=True, 
+                                frame_range=None, 
+                                data_root=CUSTOM_ROOT,
+                                )
+        generate_coco_from_custom(split_name='val_coco', seqs_names=val_sequences,
+                                root_split='train', flir_adas_v2=True, 
+                                frame_range=None, 
+                                data_root=CUSTOM_ROOT,
+                                )
+        generate_coco_from_custom(split_name='test_coco', seqs_names=test_sequences,
+                                root_split='train', flir_adas_v2=True, 
+                                frame_range=None, 
+                                data_root=CUSTOM_ROOT,
+                                )
+        generate_coco_from_custom(split_name='all_coco', seqs_names=train_sequences+val_sequences+test_sequences,
+                                root_split='train', flir_adas_v2=True, 
+                                frame_range=None, 
+                                data_root=CUSTOM_ROOT,
+                                )        
+    elif FLIR_ADAS_V2_thermal:
+        """
+        {
+        'video-4FRnNpmSmwktFJKjg': {'img_width': 512, 'img_height': 640, 'seq_length': 338}, # train
+        'video-5RSrbWYu9eokv5bvR': {'img_width': 512, 'img_height': 640, 'seq_length': 411}, # test
+        'video-6tLtjdkv5K5BuhB37': {'img_width': 512, 'img_height': 640, 'seq_length': 226}, # train
+        'video-SCiKdG3MqZfiE292B': {'img_width': 512, 'img_height': 640, 'seq_length': 428}, # test
+        'video-ZAtDSNuZZjkZFvMAo': {'img_width': 512, 'img_height': 640, 'seq_length': 1033}, # val
+        'video-ePoikf5LyTTfqchga': {'img_width': 512, 'img_height': 640, 'seq_length': 540}, # val
+        'video-t3f7QC8hZr6zYXpEZ': {'img_width': 512, 'img_height': 640, 'seq_length': 565}, # val
+        'video-vbrSzr4vFTm5QwuGH': {'img_width': 512, 'img_height': 640, 'seq_length': 208} # train
+        }
+
+        """
+        train_sequences = ['video-4FRnNpmSmwktFJKjg', 
+                           'video-6tLtjdkv5K5BuhB37', 
+                           'video-vbrSzr4vFTm5QwuGH',
+                           'video-ZAtDSNuZZjkZFvMAo']
+        val_sequences = [
+                         'video-ePoikf5LyTTfqchga', 
+                         'video-t3f7QC8hZr6zYXpEZ']
+        test_sequences = ['video-5RSrbWYu9eokv5bvR', 
+                          'video-SCiKdG3MqZfiE292B']
+        generate_coco_from_custom(split_name='train_coco_t', seqs_names=train_sequences,
+                                root_split='train_t', flir_adas_v2_thermal=True, 
+                                frame_range=None, 
+                                data_root=CUSTOM_ROOT,
+                                )
+        generate_coco_from_custom(split_name='val_coco_t', seqs_names=val_sequences,
+                                root_split='train_t', flir_adas_v2_thermal=True, 
+                                frame_range=None, 
+                                data_root=CUSTOM_ROOT,
+                                )
+        generate_coco_from_custom(split_name='test_coco_t', seqs_names=test_sequences,
+                                root_split='train_t', flir_adas_v2_thermal=True, 
+                                frame_range=None, 
+                                data_root=CUSTOM_ROOT,
+                                )
+        generate_coco_from_custom(split_name='all_coco_t', seqs_names=train_sequences+val_sequences+test_sequences,
+                                root_split='train_t', flir_adas_v2_thermal=True, 
+                                frame_range=None, 
+                                data_root=CUSTOM_ROOT,
+                                )        

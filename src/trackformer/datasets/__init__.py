@@ -10,7 +10,8 @@ from torchvision.datasets import CocoDetection
 from .coco import build as build_coco
 from .crowdhuman import build_crowdhuman
 from .mot import build_mot, build_mot_crowdhuman, build_mot_coco_person
-from .flir_adas_v2 import build_flir_adas_v2, build_flir_adas_v2_crowdhuman
+from .flir_adas_v2 import build_flir_adas_v2, build_flir_adas_v2_concat
+from .flir_adas_v2_thermal import build_flir_adas_v2_thermal
 
 def get_coco_api_from_dataset(dataset: Subset) -> COCO:
     """Return COCO class from PyTorch dataset for evaluation with COCO eval."""
@@ -46,8 +47,10 @@ def build_dataset(split: str, args: Namespace) -> Dataset:
         dataset = build_coco_panoptic(split, args)
     elif args.dataset == 'flir_adas_v2':
         dataset = build_flir_adas_v2(split, args)
-    elif args.dataset == 'flir_adas_v2_crowdhuman':
-        dataset = build_flir_adas_v2_crowdhuman(split, args)
+    elif args.dataset == 'flir_adas_v2_thermal':
+        dataset = build_flir_adas_v2_thermal(split, args)
+    elif args.dataset == 'flir_adas_v2_concat':
+        dataset = build_flir_adas_v2_concat(split, args)
     else:
         raise ValueError(f'dataset {args.dataset} not supported')
 

@@ -84,6 +84,8 @@ def make_results(outputs, targets, postprocessors, tracking, return_only_orig=Tr
                 target['prev_target']['size'].unsqueeze(dim=0))[0].cpu()
 
             if 'track_query_match_ids' in target and len(target['track_query_match_ids']):
+                print("target['boxes']", target['boxes'], "device", target['boxes'].device)
+                print("target['track_query_match_ids']", target['track_query_match_ids'], target['track_query_match_ids'].device)
                 track_queries_iou, _ = box_iou(
                     target['boxes'][target['track_query_match_ids']],
                     result['boxes'])
@@ -289,9 +291,10 @@ def evaluate(model, criterion, postprocessors, data_loader, device,
         # distribute evaluation of seqs to processes
         seqs = data_loader.dataset.sequences
         seqs_per_rank = {i: [] for i in range(utils.get_world_size())}
+        
         for i, seq in enumerate(seqs):
             rank = i % utils.get_world_size()
-            seqs_per_rank[rank].append(seq)
+            seqs_per_rank[rank].append(seq)                              
 
         # only evaluate one seq in debug mode
         if args.debug:

@@ -1,4 +1,4 @@
-# Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved
+# copy of track.py to examine the trained model
 import os
 import sys
 import time
@@ -11,6 +11,7 @@ import torch
 import tqdm
 import yaml
 from torch.utils.data import DataLoader
+from visdom import Visdom
 
 from trackformer.datasets.tracking import TrackDatasetFactory
 from trackformer.models import build_model
@@ -24,15 +25,16 @@ start = time.time()
 mm.lap.default_solver = 'lap'
 
 ex = sacred.Experiment('track', save_git_info=False)
-ex.add_config('cfgs/track.yaml')
-ex.add_named_config('reid', 'cfgs/track_reid.yaml')
+ex.add_config('/app/TMOT/cfgs/track_flir_adas_v2.yaml')
+ex.add_named_config('reid', '/app/TMOT/cfgs/track_reid.yaml')
+# ex.add_config('/app/TMOT/cfgs/train.yaml')
 
 
 @ex.automain
-def main(seed, dataset_name, obj_detect_checkpoint_file, tracker_cfg,
+def main(seed, dataset_name, tracker_cfg,
          write_images, output_dir, interpolate, verbose, load_results_dir,
          data_root_dir, generate_attention_maps, frame_range,
-         _config, _log, _run, obj_detector_model=None):
+         _config, _log, _run, obj_detector_model=None, obj_detect_checkpoint_file="/app/TMOT/models/flir_adas_v2_deformable_multi_frame/checkpoint_epoch_20.pth"):
     if write_images:
         assert output_dir is not None
 
@@ -57,27 +59,26 @@ def main(seed, dataset_name, obj_detect_checkpoint_file, tracker_cfg,
             open(osp.join(output_dir, 'track.yaml'), 'w'),
             default_flow_style=False)
 
+
+
     ##########################
     # Initialize the modules #
     ##########################
 
     # object detection
     if obj_detector_model is None:
-        obj_detect_config_path = os.path.join(
-            os.path.dirname(obj_detect_checkpoint_file),
-            'config.yaml')
+        obj_detect_config_path = '/app/TMOT/models/flir_adas_v2_deformable_multi_frame/config.yaml' ###
         obj_detect_args = nested_dict_to_namespace(yaml.unsafe_load(open(obj_detect_config_path)))
         img_transform = obj_detect_args.img_transform
-        obj_detector, _, obj_detector_post = build_model(obj_detect_args)
+        obj_detector, criterion, obj_detector_post = build_model(obj_detect_args)
+
+        # build visualizer
+        vis = Visdom(env='flir_demo_main', port=8097, server='http://localhost')
 
         obj_detect_checkpoint = torch.load(
             obj_detect_checkpoint_file, map_location=lambda storage, loc: storage)
 
         obj_detect_state_dict = obj_detect_checkpoint['model']
-        # obj_detect_state_dict = {
-        #     k: obj_detect_state_dict[k] if k in obj_detect_state_dict
-        #     else v
-        #     for k, v in obj_detector.state_dict().items()}
 
         obj_detect_state_dict = {
             k.replace('detr.', ''): v
@@ -103,17 +104,17 @@ def main(seed, dataset_name, obj_detect_checkpoint_file, tracker_cfg,
     tracker = Tracker(
         obj_detector, obj_detector_post, tracker_cfg,
         generate_attention_maps, track_logger, verbose)
-
+    
     time_total = 0
     num_frames = 0
     mot_accums = []
     dataset = TrackDatasetFactory(
         dataset_name, root_dir=data_root_dir, img_transform=img_transform)
 
-    for seq in dataset:
+    for seq in dataset:        
         tracker.reset()
 
-        _log.info(f"------------------")
+        _log.info("------------------")
         _log.info(f"TRACK SEQ: {seq}")
 
         start_frame = int(frame_range['start'] * len(seq))
@@ -133,7 +134,7 @@ def main(seed, dataset_name, obj_detect_checkpoint_file, tracker_cfg,
                 with torch.no_grad():
                     tracker.step(frame_data)
 
-            results = tracker.get_results() # 입력 주는 법을 찾아야됨
+            results = tracker.get_results()
 
             time_total += time.time() - start
 
@@ -209,3 +210,4 @@ def main(seed, dataset_name, obj_detect_checkpoint_file, tracker_cfg,
 end = time.time()
 dur = end - start
 print(dur)
+

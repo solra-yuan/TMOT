@@ -75,7 +75,7 @@ class FLIR_ADAS_V2_Wrapper(Dataset):
             sequences = train_sequences
         elif split == "TEST":
             sequences = test_sequences
-        elif split == "ALL":
+        elif split == "flir_adas_v2":
             sequences = train_sequences + test_sequences
             sequences = sorted(sequences)
         elif f"{split}" in train_sequences + test_sequences:

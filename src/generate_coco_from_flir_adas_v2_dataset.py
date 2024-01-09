@@ -19,7 +19,7 @@ from scipy.optimize import linear_sum_assignment
 from torchvision.ops.boxes import box_iou
 
 FLIR_ADAS_V2 = True
-FLIR_ADAS_V2_ROOT = '/app/data/flir_adas_v2_orig/video_rgb_test/data'
+FLIR_ADAS_V2_ROOT = '/app/data/flir_adas_v2_orig/video_thermal_test/data'
 CUSTOM_ROOT = None
 
 TARGET_ROOT = '/app/TMOT/data/flir_adas_v2'
@@ -92,7 +92,7 @@ if __name__ == '__main__':
 # vidseq_to_names = {}
 # video-5tYghHhFktjq4nQ5R-frame-001685-4kSNcWCSXX6FZyiZz
 # video-5zpwfwcv9hXTFxw8m-frame-003207-EJa2An8JwK5o58BHh
-
+'''
 def generate_coco_from_custom(split_name='train_coco', seqs_names=None,
                               root_split='train', flir_adas_v2=False, 
                               frame_range=None, 
@@ -362,3 +362,4 @@ if __name__ == '__main__':
                               frame_range=None, 
                               data_root=TARGET_ROOT,
                               )
+'''

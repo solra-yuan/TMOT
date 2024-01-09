@@ -1,10 +1,10 @@
 # copy of train_mot17
 
-dataset: flir_adas_v2
+dataset: flir_adas_v2_thermal
 tracking_eval: false
 
-train_split: train_coco
-val_split: val_coco
+train_split: train_coco_t
+val_split: val_coco_t
 
 flir_adas_v2_path_train: data/flir_adas_v2
 flir_adas_v2_path_val: data/flir_adas_v2
