@@ -1,21 +1,4 @@
 # copy of train_mot17
 
-dataset: flir_adas_v2_concat
-tracking_eval: false
-
-train_split: train_coco
-val_split: val_coco
-
-flir_adas_v2_path_train: data/flir_adas_v2
-flir_adas_v2_path_val: data/flir_adas_v2
-
-resume: models/r50_deformable_detr_plus_iterative_bbox_refinement-checkpoint_hidden_dim_288.pth
-
-epochs: 50
-lr_drop: 10
-
-flir_adas_v2_train_split: train_coco
-flir_adas_v2_val_split: val_coco
-
 flir_adas_v2_thermal_train_split: train_coco_t
 flir_adas_v2_thermal_val_split: val_coco_t

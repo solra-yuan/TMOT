@@ -118,6 +118,19 @@ ex.add_named_config('flir_adas_v2_crowdhuman',
 #     val_split=val_coco \
 #     epochs=1 \
 
+# # custom rgb-t data training
+# python src/train.py with \
+#     flir_adas_v2_concat \
+#     dataset=flir_adas_v2_concat
+#     deformable \
+#     multi_frame \
+#     tracking \
+#     output_dir=models/flir_adas_v2_deformable_multi_frame \
+#     resume=/app/TMOT/models/r50_deformable_detr_plus_iterative_bbox_refinement-checkpoint_hidden_dim_288.pth \
+#     train_split=train_coco \
+#     val_split=val_coco \
+#     epochs=30
+
 
 def train(args: Namespace) -> None:
     print(args)
@@ -134,6 +147,13 @@ def train(args: Namespace) -> None:
 
     if not args.deformable:
         assert args.num_feature_levels == 1
+
+    if args.tracking:
+        # assert args.batch_size == 1
+        if args.dataset == 'flir_adas_v2' or args.dataset == 'flir_adas_v2_concat':
+            args.tracking_eval = False  # @TODO : tracking evaluation code- look into factory.py
+        elif args.tracking_eval:
+            assert 'mot' in args.dataset
 
     output_dir = Path(args.output_dir)
     if args.output_dir:

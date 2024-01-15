@@ -14,6 +14,7 @@ from torchvision.ops.feature_pyramid_network import (FeaturePyramidNetwork,
 
 from ..util.misc import NestedTensor, is_main_process
 from .position_encoding import build_position_encoding
+from .resnet_alter import preprocess_rgb_t_to_rgb_net
 
 
 class FrozenBatchNorm2d(torch.nn.Module):
@@ -78,6 +79,7 @@ class BackboneBase(nn.Module):
         self.body = IntermediateLayerGetter(backbone, return_layers=return_layers)
 
     def forward(self, tensor_list: NestedTensor):
+        print()
         xs = self.body(tensor_list.tensors)
         out: Dict[str, NestedTensor] = {}
         for name, x in xs.items():
@@ -95,6 +97,10 @@ class Backbone(BackboneBase):
                  return_interm_layers: bool,
                  dilation: bool):
         norm_layer = FrozenBatchNorm2d
+        if name == 'resnet50_preprocessing_type_a':
+            backbone = resnet50_preprocessing_type_a(
+                replace_stride_with_dilation=[False, False, dilation],
+                pretrained=is_main_process(), norm_layer=norm_layer)
         backbone = getattr(torchvision.models, name)(
             replace_stride_with_dilation=[False, False, dilation],
             pretrained=is_main_process(), norm_layer=norm_layer)

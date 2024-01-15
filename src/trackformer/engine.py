@@ -121,7 +121,7 @@ def train_one_epoch(model: torch.nn.Module, criterion: torch.nn.Module, postproc
     metric_logger.add_meter('lr', utils.SmoothedValue(window_size=1, fmt='{value:.6f}'))
     metric_logger.add_meter('class_error', utils.SmoothedValue(window_size=1, fmt='{value:.2f}'))
 
-    for i, (samples, targets) in enumerate(metric_logger.log_every(data_loader, epoch)):
+    for i,  (samples, targets) in enumerate(metric_logger.log_every(data_loader, epoch)):
         samples = samples.to(device)
         targets = [utils.nested_dict_to_device(t, device) for t in targets]
 

@@ -24,7 +24,8 @@ def build_model(args):
         # The author said single class doesnt work well to compute focal loss. 
         # however choice of 20 classes is a bit arbitrary
         # num_classes = 1
-    elif args.dataset in ['flir_adas_v2', 'flir_adas_v2_crowdhuman']:
+    elif args.dataset in ['flir_adas_v2', 'flir_adas_v2_thermal', 
+                          'flir_adas_v2_concat', 'flir_adas_v2_crowdhuman']:
         num_classes = 20 # I suppose it's okay to set num_classes to 10 bc I have multiple categories.
         # TODO : set classes to 10 <> load only 10 embed classes... hmm.. 
     else:

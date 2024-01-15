@@ -291,8 +291,8 @@ class FLIR_ADAS_V2_concat(Dataset):
         concatenated_img = torch.cat([img1, img2], dim=0)
         # concatenated_target = torch.cat([target1, target2])
 
-        return concatenated_img, target1, target2
-        #return concatenated_img, concatenated_target
+        #return concatenated_img, target1, target2
+        return concatenated_img, target1
 
 
 class FLIR_ADAS_V2_concat_fix_random(CocoDetection):
