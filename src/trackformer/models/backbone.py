@@ -14,7 +14,7 @@ from torchvision.ops.feature_pyramid_network import (FeaturePyramidNetwork,
 
 from ..util.misc import NestedTensor, is_main_process
 from .position_encoding import build_position_encoding
-from .resnet_alter import preprocess_rgb_t_to_rgb_net
+from .resnet_alter import resnet50_preprocessing_type_a
 
 
 class FrozenBatchNorm2d(torch.nn.Module):
@@ -65,7 +65,11 @@ class BackboneBase(nn.Module):
             if (not train_backbone
                 or 'layer2' not in name
                 and 'layer3' not in name
-                and 'layer4' not in name):
+                and 'layer4' not in name
+                and 'conv_rgbt_to_latent' not in name
+                and 'rgbt_bn' not in name
+                and 'preprocess_latent_channel' not in name
+                and 'conv_inplane_to_rgb' not in name):
                 parameter.requires_grad_(False)
         if return_interm_layers:
             return_layers = {"layer1": "0", "layer2": "1", "layer3": "2", "layer4": "3"}
@@ -101,7 +105,8 @@ class Backbone(BackboneBase):
             backbone = resnet50_preprocessing_type_a(
                 replace_stride_with_dilation=[False, False, dilation],
                 pretrained=is_main_process(), norm_layer=norm_layer)
-        backbone = getattr(torchvision.models, name)(
+        else:
+            backbone = getattr(torchvision.models, name)(
             replace_stride_with_dilation=[False, False, dilation],
             pretrained=is_main_process(), norm_layer=norm_layer)
         super().__init__(backbone, train_backbone,
