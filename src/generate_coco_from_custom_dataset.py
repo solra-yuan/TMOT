@@ -20,82 +20,97 @@ from torchvision.ops.boxes import box_iou
 
 from trackformer.datasets.tracking.mots20_sequence import load_mots_gt
 
-CUSTOM_ROOT = '/app/TMOT/data/flir_adas_v2/'
-VIS_THRESHOLD = 0.25
 
-FLIR_ADAS_V2 = True
-FLIR_ADAS_V2_thermal = False
+DATA_PARSE_LIST = ['flir_adas_v2', 'flir_adas_v2_thermal', 'flir_adas_v2_small', 'flir_adas_v2_thermal_small']
+
+#기존 data가 저장되어 있는 위치
+FLIR_DATA_ROOT = '/home/solra/Datasets/flir_adas_v2/'  #'/home/solra/TMOT/data/flir_adas_v2/'
+#파싱 후 data가 저장될 루트 위치
+FLIR_SAVE_ROOT = '/home/solra/Datasets/flir_adas_v2/' #'/home/solra/TMOT/data/flir_adas_v2/' 
+
+VIS_THRESHOLD = 0.25  # 데이터 추가 정제가 필요할 경우 vis threshold 이하의 아이템은 버리는 방향으로 구현
+
 
 # add custom sequence info here
-if FLIR_ADAS_V2:
-    CUSTOM_SEQS_INFO = {
-        'video-BzZspxAweF8AnKhWK': {'img_width': 1024, 'img_height': 1224, 'seq_length': 338}, 
-        'video-FkqCGijjAKpABetZZ': {'img_width': 1024, 'img_height': 1224, 'seq_length': 226}, 
-        'video-PGdt7pJChnKoJDt35': {'img_width': 1024, 'img_height': 1224, 'seq_length': 208}, 
-        'video-RMxN6a4CcCeLGu4tA': {'img_width': 768, 'img_height': 1024, 'seq_length': 1033}, 
-        'video-YnfPeH8i2uBWmsSd2': {'img_width': 1024, 'img_height': 1224, 'seq_length': 540}, 
-        'video-dvZBYnphN2BwdMKBc': {'img_width': 768, 'img_height': 1024, 'seq_length': 565}, 
-        'video-hnbGXq3nNPjBbc7CL': {'img_width': 1024, 'img_height': 1224, 'seq_length': 411}, 
-        'video-msNEBxJE5PPDqenBM': {'img_width': 1024, 'img_height': 1224, 'seq_length': 428}
+CUSTOM_SEQS_INFO_DICT = {}
+for dataitem in DATA_PARSE_LIST:
+    if dataitem == 'flir_adas_v2' or dataitem == 'flir_adas_v2_small':
+        CUSTOM_SEQS_INFO_DICT[dataitem] = {
+            'train_sequences':
+                {
+                    'video-BzZspxAweF8AnKhWK': {'img_width': 1024, 'img_height': 1224, 'seq_length': 338}, 
+                    'video-FkqCGijjAKpABetZZ': {'img_width': 1024, 'img_height': 1224, 'seq_length': 226}, 
+                    'video-PGdt7pJChnKoJDt35': {'img_width': 1024, 'img_height': 1224, 'seq_length': 208}, 
+                    'video-RMxN6a4CcCeLGu4tA': {'img_width': 768, 'img_height': 1024, 'seq_length': 1033} 
+                },
+            'val_sequences':
+                {
+                    'video-YnfPeH8i2uBWmsSd2': {'img_width': 1024, 'img_height': 1224, 'seq_length': 540}, 
+                    'video-dvZBYnphN2BwdMKBc': {'img_width': 768, 'img_height': 1024, 'seq_length': 565} 
+                },
+            'test_sequences':
+                {    
+                    'video-hnbGXq3nNPjBbc7CL': {'img_width': 1024, 'img_height': 1224, 'seq_length': 411}, 
+                    'video-msNEBxJE5PPDqenBM': {'img_width': 1024, 'img_height': 1224, 'seq_length': 428}
+                }
         }
-elif FLIR_ADAS_V2_thermal:
-    CUSTOM_SEQS_INFO = {
-        'video-4FRnNpmSmwktFJKjg': {'img_width': 512, 'img_height': 640, 'seq_length': 338}, 
-        'video-5RSrbWYu9eokv5bvR': {'img_width': 512, 'img_height': 640, 'seq_length': 411}, 
-        'video-6tLtjdkv5K5BuhB37': {'img_width': 512, 'img_height': 640, 'seq_length': 226}, 
-        'video-SCiKdG3MqZfiE292B': {'img_width': 512, 'img_height': 640, 'seq_length': 428}, 
-        'video-ZAtDSNuZZjkZFvMAo': {'img_width': 512, 'img_height': 640, 'seq_length': 1033}, 
-        'video-ePoikf5LyTTfqchga': {'img_width': 512, 'img_height': 640, 'seq_length': 540}, 
-        'video-t3f7QC8hZr6zYXpEZ': {'img_width': 512, 'img_height': 640, 'seq_length': 565}, 
-        'video-vbrSzr4vFTm5QwuGH': {'img_width': 512, 'img_height': 640, 'seq_length': 208}
-    }
-    # CUSTOM_SEQS_INFO = {
-    #     'video-BzZspxAweF8AnKhWK': {'img_width': 1024, 'img_height': 1224, 'seq_length': 338}, 
-    #     'video-FkqCGijjAKpABetZZ': {'img_width': 1024, 'img_height': 1224, 'seq_length': 226}, 
-    #     'video-PGdt7pJChnKoJDt35': {'img_width': 1024, 'img_height': 1224, 'seq_length': 208}, 
-    #     'video-RMxN6a4CcCeLGu4tA': {'img_width': 768, 'img_height': 1024, 'seq_length': 1033}, 
-    #     'video-YnfPeH8i2uBWmsSd2': {'img_width': 1024, 'img_height': 1224, 'seq_length': 540}, 
-    #     'video-dvZBYnphN2BwdMKBc': {'img_width': 768, 'img_height': 1024, 'seq_length': 565}, 
-    #     'video-hnbGXq3nNPjBbc7CL': {'img_width': 1024, 'img_height': 1224, 'seq_length': 411}, 
-    #     'video-msNEBxJE5PPDqenBM': {'img_width': 1024, 'img_height': 1224, 'seq_length': 428}
-    #     }
+        continue
+    elif dataitem == 'flir_adas_v2_thermal' or dataitem == 'flir_adas_v2_thermal_small':
+        CUSTOM_SEQS_INFO_DICT[dataitem] = {
+            'train_sequences':
+                {
+                'video-4FRnNpmSmwktFJKjg': {'img_width': 512, 'img_height': 640, 'seq_length': 338}, 
+                'video-6tLtjdkv5K5BuhB37': {'img_width': 512, 'img_height': 640, 'seq_length': 226}, 
+                'video-vbrSzr4vFTm5QwuGH': {'img_width': 512, 'img_height': 640, 'seq_length': 208},
+                'video-ZAtDSNuZZjkZFvMAo': {'img_width': 512, 'img_height': 640, 'seq_length': 1033},
+                },
+            'val_sequences':
+                {
+                'video-ePoikf5LyTTfqchga': {'img_width': 512, 'img_height': 640, 'seq_length': 540}, 
+                'video-t3f7QC8hZr6zYXpEZ': {'img_width': 512, 'img_height': 640, 'seq_length': 565}, 
+                },
+            'test_sequences':
+                {
+                'video-5RSrbWYu9eokv5bvR': {'img_width': 512, 'img_height': 640, 'seq_length': 411}, 
+                'video-SCiKdG3MqZfiE292B': {'img_width': 512, 'img_height': 640, 'seq_length': 428}, 
+                } 
+            }
+        continue
 
-    # thermal_seq_to_rgb_seq = {}
-    rgb_seq_to_thermal_seq = {'video-BzZspxAweF8AnKhWK': 'video-4FRnNpmSmwktFJKjg',
-                              'video-FkqCGijjAKpABetZZ': 'video-6tLtjdkv5K5BuhB37',
-                              'video-PGdt7pJChnKoJDt35': 'video-vbrSzr4vFTm5QwuGH',
-                              'video-RMxN6a4CcCeLGu4tA': 'video-ZAtDSNuZZjkZFvMAo',
-                              'video-YnfPeH8i2uBWmsSd2': 'video-ePoikf5LyTTfqchga',
-                              'video-dvZBYnphN2BwdMKBc': 'video-t3f7QC8hZr6zYXpEZ',
-                              'video-hnbGXq3nNPjBbc7CL': 'video-5RSrbWYu9eokv5bvR',
-                              'video-msNEBxJE5PPDqenBM': 'video-SCiKdG3MqZfiE292B'}
-
+rgb_seq_to_thermal_seq = {'video-BzZspxAweF8AnKhWK': 'video-4FRnNpmSmwktFJKjg',
+                          'video-FkqCGijjAKpABetZZ': 'video-6tLtjdkv5K5BuhB37',
+                          'video-PGdt7pJChnKoJDt35': 'video-vbrSzr4vFTm5QwuGH',
+                          'video-RMxN6a4CcCeLGu4tA': 'video-ZAtDSNuZZjkZFvMAo',
+                          'video-YnfPeH8i2uBWmsSd2': 'video-ePoikf5LyTTfqchga',
+                          'video-dvZBYnphN2BwdMKBc': 'video-t3f7QC8hZr6zYXpEZ',
+                          'video-hnbGXq3nNPjBbc7CL': 'video-5RSrbWYu9eokv5bvR',
+                          'video-msNEBxJE5PPDqenBM': 'video-SCiKdG3MqZfiE292B'}
 
 
 def generate_coco_from_custom(split_name='train', seqs_names=None,
                            root_split='train', flir_adas_v2=False, flir_adas_v2_thermal=False,
-                           frame_range=None, data_root='data/flir_adas_v2'):
+                           frame_range=None, data_root='data/flir_adas_v2',
+                           save_root='data/flir_adas_v2'):
     """
     Generates COCO data from CUSTOM DATA.
     """
 
     if frame_range is None:
         frame_range = {'start': 0.0, 'end': 1.0}
+    coco_data_root = data_root
+    if save_root != None:
+        coco_save_root = save_root 
+    else:
+        coco_save_root = data_root
 
-    if flir_adas_v2:
-        data_root = CUSTOM_ROOT
-    elif flir_adas_v2_thermal:
-        data_root = CUSTOM_ROOT
-
-    root_split_path = os.path.join(data_root, root_split)
+    root_split_path = os.path.join(coco_data_root, root_split)
     if flir_adas_v2_thermal:
-        root_split_path = os.path.join(data_root, root_split.split('_')[0])
-    coco_dir = os.path.join(data_root, split_name)
-
+        root_split_path = os.path.join(coco_data_root, root_split.split('_')[0])
+    coco_dir = os.path.join(coco_save_root, split_name)
     if os.path.isdir(coco_dir):
         shutil.rmtree(coco_dir)
-
     os.mkdir(coco_dir)
+    annotations_dir = os.path.join(os.path.join(coco_save_root, 'annotations'))
 
     annotations = {}
     annotations['type'] = 'instances'
@@ -110,16 +125,6 @@ def generate_coco_from_custom(split_name='train', seqs_names=None,
                                   {'id': 8, 'name': 'sign', 'supercategory': 'unknown'},
                                   {'id': 9, 'name': 'other vehicle', 'supercategory': 'unknown'},
                                   {'id': 10, 'name': 'dog', 'supercategory': 'unknown'}]
-    # {'id': 1, 'name': 'person', 'supercategory': 'unknown'}
-    # {'id': 2, 'name': 'bike', 'supercategory': 'unknown'}
-    # {'id': 3, 'name': 'car', 'supercategory': 'unknown'}
-    # {'id': 4, 'name': 'motor', 'supercategory': 'unknown'}
-    # {'id': 8, 'name': 'truck', 'supercategory': 'unknown'}
-    # {'id': 10, 'name': 'light', 'supercategory': 'unknown'}
-    # {'id': 11, 'name': 'hydrant', 'supercategory': 'unknown'}
-    # {'id': 12, 'name': 'sign', 'supercategory': 'unknown'}
-    # {'id': 79, 'name': 'other vehicle', 'supercategory': 'unknown'}
-    # {'id': 17, 'name': 'dog', 'supercategory': 'unknown'}
     coco_orig_category_id_to_sorted_order_dict = {1:1, 
                                                   2:2, 
                                                   3:3, 
@@ -130,24 +135,18 @@ def generate_coco_from_custom(split_name='train', seqs_names=None,
                                                   12:8, 
                                                   79:9, 
                                                   17:10}
-
-
     annotations['annotations'] = []
 
-    annotations_dir = os.path.join(os.path.join(data_root, 'annotations'))
     if not os.path.isdir(annotations_dir):
         os.mkdir(annotations_dir)
     annotation_file = os.path.join(annotations_dir, f'{split_name}.json')
-
     # IMAGE FILES
     img_id = 0  # 모든 시퀀스 대해 통합된 image id임
-
     print("root_split_path", root_split_path)
-    # seqs : root_split_path에서 정렬된 이름.
-    seqs = sorted(os.listdir(root_split_path))
+    seqs = sorted(os.listdir(root_split_path))  # root_split_path에서 정렬된 이름.
     if flir_adas_v2_thermal:
-        seqs = [rgb_seq_to_thermal_seq[se] for se in seqs]
-        root_split_path = os.path.join(data_root, root_split)
+        seqs = [rgb_seq_to_thermal_seq[se] for se in seqs]  # thermal-rgb는 같은 순서대로 파싱함
+        root_split_path = os.path.join(coco_data_root, root_split)
         print("root_split_path, thermal:", root_split_path)
     if seqs_names is not None:
         seqs = [s for s in seqs if s in seqs_names]
@@ -156,7 +155,6 @@ def generate_coco_from_custom(split_name='train', seqs_names=None,
     print(split_name, seqs)
 
     orig_image_name_to_parsed_image_id = {}
-
     for seq in seqs:
         # CONFIG FILE
         config = configparser.ConfigParser()
@@ -218,13 +216,11 @@ def generate_coco_from_custom(split_name='train', seqs_names=None,
     for seq in seqs:       
         if not os.path.isfile(gt_file_path):
             continue
-        
-        seq_annotations = []
 
+        seq_annotations = []
         if flir_adas_v2 or flir_adas_v2_thermal:
             with open(gt_file_path, "r") as gt_file:
                 annot_json_data = json.load(gt_file)
-
             # coco from mot할 땐 mot annotation이 이게 seq의 어느 frame_id에서 온지 정보가 있음
             # sorting된 시퀀스 내에서 sorting된 frame_id는 이름의 인덱스가 됨
             # -> (frame_id와 seq)를 key로 image name to image_id를 추출할 수 있음
@@ -273,7 +269,7 @@ def generate_coco_from_custom(split_name='train', seqs_names=None,
                 else:     
                     nan_track_id_count += 1
                     print("track id is nan!", nan_track_id_count)
-                    print("track id == nan annotation", annotation)
+                    print("track id == nan annotation", annot)
                     continue
                 
                 seq_annotations.append(annotation)
@@ -298,89 +294,47 @@ def generate_coco_from_custom(split_name='train', seqs_names=None,
         json.dump(annotations, anno_file, indent=4)
 
 if __name__ == '__main__':
-    # generate_coco_from_custom(split_name='train_custom_testing', seqs_names=None,
-    #                       root_split='train', flir_adas_v2=True,
-    #                       data_root='data/flir_adas_v2')
-    if FLIR_ADAS_V2:
-        """
-        {'video-BzZspxAweF8AnKhWK': {'img_width': 1024, 'img_height': 1224, 'seq_length': 338}, # train
-        'video-FkqCGijjAKpABetZZ': {'img_width': 1024, 'img_height': 1224, 'seq_length': 226}, # train
-        'video-PGdt7pJChnKoJDt35': {'img_width': 1024, 'img_height': 1224, 'seq_length': 208}, # train
-        'video-RMxN6a4CcCeLGu4tA': {'img_width': 768, 'img_height': 1024, 'seq_length': 1033}, # val
-        'video-YnfPeH8i2uBWmsSd2': {'img_width': 1024, 'img_height': 1224, 'seq_length': 540}, # val
-        'video-dvZBYnphN2BwdMKBc': {'img_width': 768, 'img_height': 1024, 'seq_length': 565}, # val
-        'video-hnbGXq3nNPjBbc7CL': {'img_width': 1024, 'img_height': 1224, 'seq_length': 411}, # test
-        'video-msNEBxJE5PPDqenBM': {'img_width': 1024, 'img_height': 1224, 'seq_length': 428}} # test
-        """
-        train_sequences = ['video-BzZspxAweF8AnKhWK', 
-                        'video-FkqCGijjAKpABetZZ', 
-                        'video-PGdt7pJChnKoJDt35',
-                        'video-RMxN6a4CcCeLGu4tA']
-        val_sequences = [
-                        'video-YnfPeH8i2uBWmsSd2',
-                        'video-dvZBYnphN2BwdMKBc',]
-        test_sequences = ['video-hnbGXq3nNPjBbc7CL',
-                        'video-msNEBxJE5PPDqenBM']
-        generate_coco_from_custom(split_name='train_coco', seqs_names=train_sequences,
-                                root_split='train', flir_adas_v2=True, 
-                                frame_range=None, 
-                                data_root=CUSTOM_ROOT,
-                                )
-        generate_coco_from_custom(split_name='val_coco', seqs_names=val_sequences,
-                                root_split='train', flir_adas_v2=True, 
-                                frame_range=None, 
-                                data_root=CUSTOM_ROOT,
-                                )
-        generate_coco_from_custom(split_name='test_coco', seqs_names=test_sequences,
-                                root_split='train', flir_adas_v2=True, 
-                                frame_range=None, 
-                                data_root=CUSTOM_ROOT,
-                                )
-        generate_coco_from_custom(split_name='all_coco', seqs_names=train_sequences+val_sequences+test_sequences,
-                                root_split='train', flir_adas_v2=True, 
-                                frame_range=None, 
-                                data_root=CUSTOM_ROOT,
-                                )        
-    elif FLIR_ADAS_V2_thermal:
-        """
-        {
-        'video-4FRnNpmSmwktFJKjg': {'img_width': 512, 'img_height': 640, 'seq_length': 338}, # train
-        'video-5RSrbWYu9eokv5bvR': {'img_width': 512, 'img_height': 640, 'seq_length': 411}, # test
-        'video-6tLtjdkv5K5BuhB37': {'img_width': 512, 'img_height': 640, 'seq_length': 226}, # train
-        'video-SCiKdG3MqZfiE292B': {'img_width': 512, 'img_height': 640, 'seq_length': 428}, # test
-        'video-ZAtDSNuZZjkZFvMAo': {'img_width': 512, 'img_height': 640, 'seq_length': 1033}, # val
-        'video-ePoikf5LyTTfqchga': {'img_width': 512, 'img_height': 640, 'seq_length': 540}, # val
-        'video-t3f7QC8hZr6zYXpEZ': {'img_width': 512, 'img_height': 640, 'seq_length': 565}, # val
-        'video-vbrSzr4vFTm5QwuGH': {'img_width': 512, 'img_height': 640, 'seq_length': 208} # train
-        }
 
-        """
-        train_sequences = ['video-4FRnNpmSmwktFJKjg', 
-                           'video-6tLtjdkv5K5BuhB37', 
-                           'video-vbrSzr4vFTm5QwuGH',
-                           'video-ZAtDSNuZZjkZFvMAo']
-        val_sequences = [
-                         'video-ePoikf5LyTTfqchga', 
-                         'video-t3f7QC8hZr6zYXpEZ']
-        test_sequences = ['video-5RSrbWYu9eokv5bvR', 
-                          'video-SCiKdG3MqZfiE292B']
-        generate_coco_from_custom(split_name='train_coco_t', seqs_names=train_sequences,
-                                root_split='train_t', flir_adas_v2_thermal=True, 
-                                frame_range=None, 
-                                data_root=CUSTOM_ROOT,
-                                )
-        generate_coco_from_custom(split_name='val_coco_t', seqs_names=val_sequences,
-                                root_split='train_t', flir_adas_v2_thermal=True, 
-                                frame_range=None, 
-                                data_root=CUSTOM_ROOT,
-                                )
-        generate_coco_from_custom(split_name='test_coco_t', seqs_names=test_sequences,
-                                root_split='train_t', flir_adas_v2_thermal=True, 
-                                frame_range=None, 
-                                data_root=CUSTOM_ROOT,
-                                )
-        generate_coco_from_custom(split_name='all_coco_t', seqs_names=train_sequences+val_sequences+test_sequences,
-                                root_split='train_t', flir_adas_v2_thermal=True, 
-                                frame_range=None, 
-                                data_root=CUSTOM_ROOT,
-                                )        
+    for item in DATA_PARSE_LIST:
+        if item =='flir_adas_v2':
+            split_names_list = ['train_coco', 'val_coco', 'test_coco']
+            for split in split_names_list:
+                seqs_names_from_split = "".join([split.split('_')[0], '_sequences'])
+                generate_coco_from_custom(split_name=split, seqs_names=CUSTOM_SEQS_INFO_DICT[item][seqs_names_from_split],
+                                        root_split='train', flir_adas_v2=True, 
+                                        frame_range=None, 
+                                        data_root=FLIR_DATA_ROOT, save_root=FLIR_SAVE_ROOT
+                                        )
+        elif item == 'flir_adas_v2_thermal':
+            #name should match 'flir_adas_v2' split names with additional '_t'
+            split_names_list = ['train_coco_t', 'val_coco_t', 'test_coco_t']  
+            for split in split_names_list:
+                seqs_names_from_split = "".join([split.split('_')[0], '_sequences'])
+                generate_coco_from_custom(split_name=split, seqs_names=CUSTOM_SEQS_INFO_DICT[item][seqs_names_from_split],
+                                        root_split='train_t', flir_adas_v2_thermal=True, 
+                                        frame_range=None, 
+                                        data_root=FLIR_DATA_ROOT, save_root=FLIR_SAVE_ROOT
+                                        )
+
+        elif item == 'flir_adas_v2_small':
+            data_root = "".join([FLIR_DATA_ROOT.rstrip('/'), "_small"])
+            split_names_list = ['train_coco', 'val_coco', 'test_coco']
+            for split in split_names_list:
+                seqs_names_from_split = "".join([split.split('_')[0], '_sequences'])
+                generate_coco_from_custom(split_name=split, seqs_names=CUSTOM_SEQS_INFO_DICT[item][seqs_names_from_split],
+                                        root_split='train', flir_adas_v2=True, 
+                                        frame_range=None, 
+                                        data_root=FLIR_DATA_ROOT, save_root=FLIR_SAVE_ROOT
+                                        )
+            
+        elif item == 'flir_adas_v2_thermal_small':
+            #name should match 'flir_adas_v2' split names with additional '_t'
+            data_root = "".join([FLIR_DATA_ROOT.rstrip('/'), "_small"])
+            split_names_list = ['train_coco_t', 'val_coco_t', 'test_coco_t']  
+            for split in split_names_list:
+                seqs_names_from_split = "".join([split.split('_')[0], '_sequences'])
+                generate_coco_from_custom(split_name=split, seqs_names=CUSTOM_SEQS_INFO_DICT[item][seqs_names_from_split],
+                                        root_split='train_t', flir_adas_v2_thermal=True, 
+                                        frame_range=None, 
+                                        data_root=FLIR_DATA_ROOT, save_root=FLIR_SAVE_ROOT
+                                        )
