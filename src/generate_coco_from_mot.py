@@ -30,12 +30,20 @@ MOT_15_SEQS_INFO = {
     'KITTI-17': {'img_width': 1224, 'img_height': 370, 'seq_length': 145},
     'PETS09-S2L1': {'img_width': 768, 'img_height': 576, 'seq_length': 795},
     'TUD-Campus': {'img_width': 640, 'img_height': 480, 'seq_length': 71},
-    'TUD-Stadtmitte': {'img_width': 640, 'img_height': 480, 'seq_length': 179},}
+    'TUD-Stadtmitte': {'img_width': 640, 'img_height': 480, 'seq_length': 179}
+}
 
 
-def generate_coco_from_mot(split_name='train', seqs_names=None,
-                           root_split='train', mots=False, mots_vis=False,
-                           frame_range=None, data_root='data/MOT17'):
+def generate_coco_from_mot(
+    split_name='train',
+    seqs_names=None,
+    root_split='train',
+    mots=False,
+    mots_vis=False,
+    frame_range=None,
+    data_root='data/MOT17',
+    dataset_base_path=None,
+):
     """
     Generates COCO data from MOT.
     """
@@ -44,9 +52,13 @@ def generate_coco_from_mot(split_name='train', seqs_names=None,
 
     if mots:
         data_root = MOTS_ROOT
+
     root_split_path = os.path.join(data_root, root_split)
     root_split_mots_path = os.path.join(MOTS_ROOT, root_split)
     coco_dir = os.path.join(data_root, split_name)
+
+    if dataset_base_path is None:
+        dataset_base_path = os.path.join(os.getcwd(), root_split_path)
 
     if os.path.isdir(coco_dir):
         shutil.rmtree(coco_dir)
@@ -115,8 +127,9 @@ def generate_coco_from_mot(split_name='train', seqs_names=None,
 
             img_id += 1
 
-            os.symlink(os.path.join(os.getcwd(), root_split_path, seq, 'img1', img),
-                       os.path.join(coco_dir, f"{seq}_{img}"))
+            originPath = os.path.join(dataset_base_path, seq, 'img1', img)
+            symlinkPath = os.path.join(coco_dir, f"{seq}_{img}")
+            os.symlink(originPath, symlinkPath)
 
     # GT
     annotation_id = 0
@@ -149,7 +162,10 @@ def generate_coco_from_mot(split_name='train', seqs_names=None,
                     bbox = rletools.toBbox(mask_object.mask)
                     bbox = [int(c) for c in bbox]
                     area = bbox[2] * bbox[3]
-                    image_id = img_file_name_to_id.get(f"{seq}_{frame_id:06d}.jpg", None)
+                    image_id = img_file_name_to_id.get(
+                        f"{seq}_{frame_id:06d}.jpg",
+                        None
+                    )
                     if image_id is None:
                         continue
 
@@ -182,13 +198,15 @@ def generate_coco_from_mot(split_name='train', seqs_names=None,
 
                 for row in reader:
                     if int(row[6]) == 1 and (seq in MOT_15_SEQS_INFO or int(row[7]) == 1):
-                        bbox = [float(row[2]), float(row[3]), float(row[4]), float(row[5])]
+                        bbox = [float(row[2]), float(row[3]),
+                                float(row[4]), float(row[5])]
                         bbox = [int(c) for c in bbox]
 
                         area = bbox[2] * bbox[3]
                         visibility = float(row[8])
                         frame_id = int(row[0])
-                        image_id = img_file_name_to_id.get(f"{seq}_{frame_id:06d}.jpg", None)
+                        image_id = img_file_name_to_id.get(
+                            f"{seq}_{frame_id:06d}.jpg", None)
                         if image_id is None:
                             continue
                         track_id = int(row[1])
@@ -215,7 +233,7 @@ def generate_coco_from_mot(split_name='train', seqs_names=None,
 
             annotations['annotations'].extend(seq_annotations)
 
-            #change ignore based on MOTS mask
+            # change ignore based on MOTS mask
             if mots_vis:
                 gt_file_mots = os.path.join(
                     root_split_mots_path,
@@ -227,8 +245,13 @@ def generate_coco_from_mot(split_name='train', seqs_names=None,
 
                     for frame_id, frame_annotations in seq_annotations_per_frame.items():
                         mask_objects = mask_objects_per_frame[frame_id]
-                        mask_object_bboxes = [rletools.toBbox(obj.mask) for obj in mask_objects]
-                        mask_object_bboxes = torch.tensor(mask_object_bboxes).float()
+                        mask_object_bboxes = [
+                            rletools.toBbox(obj.mask) for obj in mask_objects
+                        ]
+
+                        mask_object_bboxes = torch.tensor(
+                            mask_object_bboxes
+                        ).float()
 
                         frame_boxes = [a['bbox'] for a in frame_annotations]
                         frame_boxes = torch.tensor(frame_boxes).float()
@@ -239,7 +262,9 @@ def generate_coco_from_mot(split_name='train', seqs_names=None,
 
                         mask_iou = box_iou(mask_object_bboxes, frame_boxes)
 
-                        mask_indices, frame_indices = linear_sum_assignment(-mask_iou)
+                        mask_indices, frame_indices = linear_sum_assignment(
+                            -mask_iou
+                        )
                         for m_i, f_i in zip(mask_indices, frame_indices):
                             if mask_iou[m_i, f_i] < 0.5:
                                 continue
@@ -296,6 +321,8 @@ if __name__ == '__main__':
 
     mot15_seqs_names = list(MOT_15_SEQS_INFO.keys())
 
+    dataset_base_path = '/mnt/y/Datasets/MOT17/train'
+
     if args.mots20:
         #
         # MOTS20
@@ -305,7 +332,9 @@ if __name__ == '__main__':
         generate_coco_from_mot(
             'mots20_train_coco',
             seqs_names=['MOTS20-02', 'MOTS20-05', 'MOTS20-09', 'MOTS20-11'],
-            mots=True)
+            mots=True,
+            dataset_base_path=dataset_base_path
+        )
 
         # TRAIN SPLITS
         for i in range(4):
@@ -314,10 +343,14 @@ if __name__ == '__main__':
 
             generate_coco_from_mot(
                 f'mots20_train_{i + 1}_coco',
-                seqs_names=train_seqs, mots=True)
+                seqs_names=train_seqs, mots=True,
+                dataset_base_path=dataset_base_path
+            )
             generate_coco_from_mot(
                 f'mots20_val_{i + 1}_coco',
-                seqs_names=val_seqs, mots=True)
+                seqs_names=val_seqs, mots=True,
+                dataset_base_path=dataset_base_path
+            )
 
     elif args.mot20:
         data_root = 'data/MOT20'
@@ -326,7 +359,9 @@ if __name__ == '__main__':
         generate_coco_from_mot(
             'mot20_train_coco',
             seqs_names=train_seqs,
-            data_root=data_root)
+            data_root=data_root,
+            dataset_base_path=dataset_base_path
+        )
 
         for i in range(0, len(train_seqs)):
             train_seqs_copy = train_seqs.copy()
@@ -335,23 +370,32 @@ if __name__ == '__main__':
             generate_coco_from_mot(
                 f'mot20_train_{i + 1}_coco',
                 seqs_names=train_seqs_copy,
-                data_root=data_root)
+                data_root=data_root,
+                dataset_base_path=dataset_base_path
+            )
             generate_coco_from_mot(
                 f'mot20_val_{i + 1}_coco',
                 seqs_names=val_seqs,
-                data_root=data_root)
+                data_root=data_root,
+                dataset_base_path=dataset_base_path
+            )
 
         # CROSS VAL FRAME SPLIT
         generate_coco_from_mot(
             'mot20_train_cross_val_frame_0_0_to_0_5_coco',
             seqs_names=train_seqs,
             frame_range={'start': 0, 'end': 0.5},
-            data_root=data_root)
+            data_root=data_root,
+            dataset_base_path=dataset_base_path
+        )
+
         generate_coco_from_mot(
             'mot20_train_cross_val_frame_0_5_to_1_0_coco',
             seqs_names=train_seqs,
             frame_range={'start': 0.5, 'end': 1.0},
-            data_root=data_root)
+            data_root=data_root,
+            dataset_base_path=dataset_base_path
+        )
 
     else:
         #
@@ -361,61 +405,175 @@ if __name__ == '__main__':
         # CROSS VAL SPLIT 1
         generate_coco_from_mot(
             'mot17_train_cross_val_1_coco',
-            seqs_names=['MOT17-04-FRCNN', 'MOT17-05-FRCNN', 'MOT17-09-FRCNN', 'MOT17-11-FRCNN'])
+            seqs_names=[
+                'MOT17-04-FRCNN',
+                'MOT17-05-FRCNN',
+                'MOT17-09-FRCNN',
+                'MOT17-11-FRCNN'
+            ],
+            dataset_base_path=dataset_base_path
+        )
         generate_coco_from_mot(
             'mot17_val_cross_val_1_coco',
-            seqs_names=['MOT17-02-FRCNN', 'MOT17-10-FRCNN', 'MOT17-13-FRCNN'])
+            seqs_names=[
+                'MOT17-02-FRCNN',
+                'MOT17-10-FRCNN',
+                'MOT17-13-FRCNN'
+            ],
+            dataset_base_path=dataset_base_path
+        )
 
         # CROSS VAL SPLIT 2
         generate_coco_from_mot(
             'mot17_train_cross_val_2_coco',
-            seqs_names=['MOT17-02-FRCNN', 'MOT17-05-FRCNN', 'MOT17-09-FRCNN', 'MOT17-10-FRCNN', 'MOT17-13-FRCNN'])
+            seqs_names=[
+                'MOT17-02-FRCNN',
+                'MOT17-05-FRCNN',
+                'MOT17-09-FRCNN',
+                'MOT17-10-FRCNN',
+                'MOT17-13-FRCNN'
+            ],
+            dataset_base_path=dataset_base_path
+        )
+
         generate_coco_from_mot(
             'mot17_val_cross_val_2_coco',
-            seqs_names=['MOT17-04-FRCNN', 'MOT17-11-FRCNN'])
+            seqs_names=[
+                'MOT17-04-FRCNN',
+                'MOT17-11-FRCNN'
+            ],
+            dataset_base_path=dataset_base_path
+        )
 
         # CROSS VAL SPLIT 3
         generate_coco_from_mot(
             'mot17_train_cross_val_3_coco',
-            seqs_names=['MOT17-02-FRCNN', 'MOT17-04-FRCNN', 'MOT17-10-FRCNN', 'MOT17-11-FRCNN', 'MOT17-13-FRCNN'])
+            seqs_names=[
+                'MOT17-02-FRCNN',
+                'MOT17-04-FRCNN',
+                'MOT17-10-FRCNN',
+                'MOT17-11-FRCNN',
+                'MOT17-13-FRCNN'
+            ],
+            dataset_base_path=dataset_base_path
+        )
+
         generate_coco_from_mot(
             'mot17_val_cross_val_3_coco',
-            seqs_names=['MOT17-05-FRCNN', 'MOT17-09-FRCNN'])
+            seqs_names=[
+                'MOT17-05-FRCNN',
+                'MOT17-09-FRCNN'
+            ],
+            dataset_base_path=dataset_base_path
+        )
 
         # CROSS VAL FRAME SPLIT
         generate_coco_from_mot(
             'mot17_train_cross_val_frame_0_0_to_0_25_coco',
-            seqs_names=['MOT17-02-FRCNN', 'MOT17-04-FRCNN', 'MOT17-05-FRCNN', 'MOT17-09-FRCNN', 'MOT17-10-FRCNN', 'MOT17-11-FRCNN', 'MOT17-13-FRCNN'],
-            frame_range={'start': 0, 'end': 0.25})
+            seqs_names=[
+                'MOT17-02-FRCNN',
+                'MOT17-04-FRCNN',
+                'MOT17-05-FRCNN',
+                'MOT17-09-FRCNN',
+                'MOT17-10-FRCNN',
+                'MOT17-11-FRCNN',
+                'MOT17-13-FRCNN'
+            ],
+            frame_range={
+                'start': 0,
+                'end': 0.25
+            },
+            dataset_base_path=dataset_base_path
+        )
+
         generate_coco_from_mot(
             'mot17_train_cross_val_frame_0_0_to_0_5_coco',
-            seqs_names=['MOT17-02-FRCNN', 'MOT17-04-FRCNN', 'MOT17-05-FRCNN', 'MOT17-09-FRCNN', 'MOT17-10-FRCNN', 'MOT17-11-FRCNN', 'MOT17-13-FRCNN'],
-            frame_range={'start': 0, 'end': 0.5})
+            seqs_names=[
+                'MOT17-02-FRCNN',
+                'MOT17-04-FRCNN',
+                'MOT17-05-FRCNN',
+                'MOT17-09-FRCNN',
+                'MOT17-10-FRCNN',
+                'MOT17-11-FRCNN',
+                'MOT17-13-FRCNN'
+            ],
+            frame_range={
+                'start': 0,
+                'end': 0.5
+            },
+            dataset_base_path=dataset_base_path
+        )
+
         generate_coco_from_mot(
             'mot17_train_cross_val_frame_0_5_to_1_0_coco',
-            seqs_names=['MOT17-02-FRCNN', 'MOT17-04-FRCNN', 'MOT17-05-FRCNN', 'MOT17-09-FRCNN', 'MOT17-10-FRCNN', 'MOT17-11-FRCNN', 'MOT17-13-FRCNN'],
-            frame_range={'start': 0.5, 'end': 1.0})
+            seqs_names=[
+                'MOT17-02-FRCNN',
+                'MOT17-04-FRCNN',
+                'MOT17-05-FRCNN',
+                'MOT17-09-FRCNN',
+                'MOT17-10-FRCNN',
+                'MOT17-11-FRCNN',
+                'MOT17-13-FRCNN'
+            ],
+            frame_range={
+                'start': 0.5,
+                'end': 1.0
+            },
+            dataset_base_path=dataset_base_path)
 
         generate_coco_from_mot(
             'mot17_train_cross_val_frame_0_75_to_1_0_coco',
-            seqs_names=['MOT17-02-FRCNN', 'MOT17-04-FRCNN', 'MOT17-05-FRCNN', 'MOT17-09-FRCNN', 'MOT17-10-FRCNN', 'MOT17-11-FRCNN', 'MOT17-13-FRCNN'],
-            frame_range={'start': 0.75, 'end': 1.0})
+            seqs_names=[
+                'MOT17-02-FRCNN',
+                'MOT17-04-FRCNN',
+                'MOT17-05-FRCNN',
+                'MOT17-09-FRCNN',
+                'MOT17-10-FRCNN',
+                'MOT17-11-FRCNN',
+                'MOT17-13-FRCNN'
+            ],
+            frame_range={
+                'start': 0.75,
+                'end': 1.0
+            },
+            dataset_base_path=dataset_base_path
+        )
 
         # TRAIN SET
         generate_coco_from_mot(
             'mot17_train_coco',
-            seqs_names=['MOT17-02-FRCNN', 'MOT17-04-FRCNN', 'MOT17-05-FRCNN', 'MOT17-09-FRCNN',
-                        'MOT17-10-FRCNN', 'MOT17-11-FRCNN', 'MOT17-13-FRCNN'])
+            seqs_names=[
+                'MOT17-02-FRCNN',
+                'MOT17-04-FRCNN',
+                'MOT17-05-FRCNN',
+                'MOT17-09-FRCNN',
+                'MOT17-10-FRCNN',
+                'MOT17-11-FRCNN',
+                'MOT17-13-FRCNN'
+            ],
+            dataset_base_path=dataset_base_path
+        )
 
         for i in range(0, 7):
             train_seqs = [
-                'MOT17-02-FRCNN', 'MOT17-04-FRCNN', 'MOT17-05-FRCNN', 'MOT17-09-FRCNN',
-                'MOT17-10-FRCNN', 'MOT17-11-FRCNN', 'MOT17-13-FRCNN']
+                'MOT17-02-FRCNN',
+                'MOT17-04-FRCNN',
+                'MOT17-05-FRCNN',
+                'MOT17-09-FRCNN',
+                'MOT17-10-FRCNN',
+                'MOT17-11-FRCNN',
+                'MOT17-13-FRCNN'
+            ]
             val_seqs = train_seqs.pop(i)
 
             generate_coco_from_mot(
                 f'mot17_train_{i + 1}_coco',
-                seqs_names=train_seqs)
+                seqs_names=train_seqs,
+                dataset_base_path=dataset_base_path
+            )
+
             generate_coco_from_mot(
                 f'mot17_val_{i + 1}_coco',
-                seqs_names=val_seqs)
+                seqs_names=val_seqs,
+                dataset_base_path=dataset_base_path
+            )
