@@ -21,12 +21,15 @@ from torchvision.ops.boxes import box_iou
 from trackformer.datasets.tracking.mots20_sequence import load_mots_gt
 
 
-DATA_PARSE_LIST = ['flir_adas_v2', 'flir_adas_v2_thermal', 'flir_adas_v2_small', 'flir_adas_v2_thermal_small']
+DATA_PARSE_LIST = ['flir_adas_v2', 'flir_adas_v2_thermal',
+                   'flir_adas_v2_small', 'flir_adas_v2_thermal_small']
 
-#기존 data가 저장되어 있는 위치
-FLIR_DATA_ROOT = '/home/solra/Datasets/flir_adas_v2/'  #'/home/solra/TMOT/data/flir_adas_v2/'
-#파싱 후 data가 저장될 루트 위치
-FLIR_SAVE_ROOT = '/home/solra/Datasets/flir_adas_v2/' #'/home/solra/TMOT/data/flir_adas_v2/' 
+# 기존 data가 저장되어 있는 위치
+# '/home/solra/TMOT/data/flir_adas_v2/'
+FLIR_DATA_ROOT = '/home/solra/Datasets/flir_adas_v2/'
+# 파싱 후 data가 저장될 루트 위치
+# '/home/solra/TMOT/data/flir_adas_v2/'
+FLIR_SAVE_ROOT = '/home/solra/Datasets/flir_adas_v2/'
 
 VIS_THRESHOLD = 0.25  # 데이터 추가 정제가 필요할 경우 vis threshold 이하의 아이템은 버리는 방향으로 구현
 
@@ -38,44 +41,42 @@ for dataitem in DATA_PARSE_LIST:
         CUSTOM_SEQS_INFO_DICT[dataitem] = {
             'train_sequences':
                 {
-                    'video-BzZspxAweF8AnKhWK': {'img_width': 1024, 'img_height': 1224, 'seq_length': 338}, 
-                    'video-FkqCGijjAKpABetZZ': {'img_width': 1024, 'img_height': 1224, 'seq_length': 226}, 
-                    'video-PGdt7pJChnKoJDt35': {'img_width': 1024, 'img_height': 1224, 'seq_length': 208}, 
-                    'video-RMxN6a4CcCeLGu4tA': {'img_width': 768, 'img_height': 1024, 'seq_length': 1033} 
+                    'video-BzZspxAweF8AnKhWK': {'img_width': 1024, 'img_height': 1224, 'seq_length': 338},
+                    'video-FkqCGijjAKpABetZZ': {'img_width': 1024, 'img_height': 1224, 'seq_length': 226},
+                    'video-PGdt7pJChnKoJDt35': {'img_width': 1024, 'img_height': 1224, 'seq_length': 208},
+                    'video-RMxN6a4CcCeLGu4tA': {'img_width': 768, 'img_height': 1024, 'seq_length': 1033}
                 },
             'val_sequences':
                 {
-                    'video-YnfPeH8i2uBWmsSd2': {'img_width': 1024, 'img_height': 1224, 'seq_length': 540}, 
-                    'video-dvZBYnphN2BwdMKBc': {'img_width': 768, 'img_height': 1024, 'seq_length': 565} 
+                    'video-YnfPeH8i2uBWmsSd2': {'img_width': 1024, 'img_height': 1224, 'seq_length': 540},
+                    'video-dvZBYnphN2BwdMKBc': {'img_width': 768, 'img_height': 1024, 'seq_length': 565}
                 },
             'test_sequences':
-                {    
-                    'video-hnbGXq3nNPjBbc7CL': {'img_width': 1024, 'img_height': 1224, 'seq_length': 411}, 
+                {
+                    'video-hnbGXq3nNPjBbc7CL': {'img_width': 1024, 'img_height': 1224, 'seq_length': 411},
                     'video-msNEBxJE5PPDqenBM': {'img_width': 1024, 'img_height': 1224, 'seq_length': 428}
                 }
         }
-        continue
     elif dataitem == 'flir_adas_v2_thermal' or dataitem == 'flir_adas_v2_thermal_small':
         CUSTOM_SEQS_INFO_DICT[dataitem] = {
             'train_sequences':
                 {
-                'video-4FRnNpmSmwktFJKjg': {'img_width': 512, 'img_height': 640, 'seq_length': 338}, 
-                'video-6tLtjdkv5K5BuhB37': {'img_width': 512, 'img_height': 640, 'seq_length': 226}, 
-                'video-vbrSzr4vFTm5QwuGH': {'img_width': 512, 'img_height': 640, 'seq_length': 208},
-                'video-ZAtDSNuZZjkZFvMAo': {'img_width': 512, 'img_height': 640, 'seq_length': 1033},
+                    'video-4FRnNpmSmwktFJKjg': {'img_width': 512, 'img_height': 640, 'seq_length': 338},
+                    'video-6tLtjdkv5K5BuhB37': {'img_width': 512, 'img_height': 640, 'seq_length': 226},
+                    'video-vbrSzr4vFTm5QwuGH': {'img_width': 512, 'img_height': 640, 'seq_length': 208},
+                    'video-ZAtDSNuZZjkZFvMAo': {'img_width': 512, 'img_height': 640, 'seq_length': 1033},
                 },
             'val_sequences':
                 {
-                'video-ePoikf5LyTTfqchga': {'img_width': 512, 'img_height': 640, 'seq_length': 540}, 
-                'video-t3f7QC8hZr6zYXpEZ': {'img_width': 512, 'img_height': 640, 'seq_length': 565}, 
+                    'video-ePoikf5LyTTfqchga': {'img_width': 512, 'img_height': 640, 'seq_length': 540},
+                    'video-t3f7QC8hZr6zYXpEZ': {'img_width': 512, 'img_height': 640, 'seq_length': 565},
                 },
             'test_sequences':
                 {
-                'video-5RSrbWYu9eokv5bvR': {'img_width': 512, 'img_height': 640, 'seq_length': 411}, 
-                'video-SCiKdG3MqZfiE292B': {'img_width': 512, 'img_height': 640, 'seq_length': 428}, 
-                } 
-            }
-        continue
+                    'video-5RSrbWYu9eokv5bvR': {'img_width': 512, 'img_height': 640, 'seq_length': 411},
+                    'video-SCiKdG3MqZfiE292B': {'img_width': 512, 'img_height': 640, 'seq_length': 428},
+                }
+        }
 
 rgb_seq_to_thermal_seq = {'video-BzZspxAweF8AnKhWK': 'video-4FRnNpmSmwktFJKjg',
                           'video-FkqCGijjAKpABetZZ': 'video-6tLtjdkv5K5BuhB37',
@@ -88,9 +89,9 @@ rgb_seq_to_thermal_seq = {'video-BzZspxAweF8AnKhWK': 'video-4FRnNpmSmwktFJKjg',
 
 
 def generate_coco_from_custom(split_name='train', seqs_names=None,
-                           root_split='train', flir_adas_v2=False, flir_adas_v2_thermal=False,
-                           frame_range=None, data_root='data/flir_adas_v2',
-                           save_root='data/flir_adas_v2'):
+                              root_split='train', flir_adas_v2=False, flir_adas_v2_thermal=False,
+                              frame_range=None, data_root='data/flir_adas_v2',
+                              save_root='data/flir_adas_v2'):
     """
     Generates COCO data from CUSTOM DATA.
     """
@@ -99,13 +100,14 @@ def generate_coco_from_custom(split_name='train', seqs_names=None,
         frame_range = {'start': 0.0, 'end': 1.0}
     coco_data_root = data_root
     if save_root != None:
-        coco_save_root = save_root 
+        coco_save_root = save_root
     else:
         coco_save_root = data_root
 
     root_split_path = os.path.join(coco_data_root, root_split)
     if flir_adas_v2_thermal:
-        root_split_path = os.path.join(coco_data_root, root_split.split('_')[0])
+        root_split_path = os.path.join(
+            coco_data_root, root_split.split('_')[0])
     coco_dir = os.path.join(coco_save_root, split_name)
     if os.path.isdir(coco_dir):
         shutil.rmtree(coco_dir)
@@ -115,26 +117,34 @@ def generate_coco_from_custom(split_name='train', seqs_names=None,
     annotations = {}
     annotations['type'] = 'instances'
     annotations['images'] = []
-    annotations['categories'] = [ {'id': 1, 'name': 'person', 'supercategory': 'unknown'},
-                                  {'id': 2, 'name': 'bike', 'supercategory': 'unknown'},
-                                  {'id': 3, 'name': 'car', 'supercategory': 'unknown'},
-                                  {'id': 4, 'name': 'motor', 'supercategory': 'unknown'},
-                                  {'id': 5, 'name': 'truck', 'supercategory': 'unknown'},
-                                  {'id': 6, 'name': 'light', 'supercategory': 'unknown'},
-                                  {'id': 7, 'name': 'hydrant', 'supercategory': 'unknown'},
-                                  {'id': 8, 'name': 'sign', 'supercategory': 'unknown'},
-                                  {'id': 9, 'name': 'other vehicle', 'supercategory': 'unknown'},
-                                  {'id': 10, 'name': 'dog', 'supercategory': 'unknown'}]
-    coco_orig_category_id_to_sorted_order_dict = {1:1, 
-                                                  2:2, 
-                                                  3:3, 
-                                                  4:4, 
-                                                  8:5, 
-                                                  10:6, 
-                                                  11:7, 
-                                                  12:8, 
-                                                  79:9, 
-                                                  17:10}
+    annotations['categories'] = [{'id': 1, 'name': 'person', 'supercategory': 'unknown'},
+                                 {'id': 2, 'name': 'bike',
+                                  'supercategory': 'unknown'},
+                                 {'id': 3, 'name': 'car',
+                                  'supercategory': 'unknown'},
+                                 {'id': 4, 'name': 'motor',
+                                  'supercategory': 'unknown'},
+                                 {'id': 5, 'name': 'truck',
+                                  'supercategory': 'unknown'},
+                                 {'id': 6, 'name': 'light',
+                                  'supercategory': 'unknown'},
+                                 {'id': 7, 'name': 'hydrant',
+                                  'supercategory': 'unknown'},
+                                 {'id': 8, 'name': 'sign',
+                                  'supercategory': 'unknown'},
+                                 {'id': 9, 'name': 'other vehicle',
+                                  'supercategory': 'unknown'},
+                                 {'id': 10, 'name': 'dog', 'supercategory': 'unknown'}]
+    coco_orig_category_id_to_sorted_order_dict = {1: 1,
+                                                  2: 2,
+                                                  3: 3,
+                                                  4: 4,
+                                                  8: 5,
+                                                  10: 6,
+                                                  11: 7,
+                                                  12: 8,
+                                                  79: 9,
+                                                  17: 10}
     annotations['annotations'] = []
 
     if not os.path.isdir(annotations_dir):
@@ -145,7 +155,8 @@ def generate_coco_from_custom(split_name='train', seqs_names=None,
     print("root_split_path", root_split_path)
     seqs = sorted(os.listdir(root_split_path))  # root_split_path에서 정렬된 이름.
     if flir_adas_v2_thermal:
-        seqs = [rgb_seq_to_thermal_seq[se] for se in seqs]  # thermal-rgb는 같은 순서대로 파싱함
+        seqs = [rgb_seq_to_thermal_seq[se]
+                for se in seqs]  # thermal-rgb는 같은 순서대로 파싱함
         root_split_path = os.path.join(coco_data_root, root_split)
         print("root_split_path, thermal:", root_split_path)
     if seqs_names is not None:
@@ -175,7 +186,7 @@ def generate_coco_from_custom(split_name='train', seqs_names=None,
         seq_length = len(seg_list_dir)
 
         for i, img in enumerate(sorted(seg_list_dir)):
-            
+
             if i == 0:
                 first_frame_image_id = img_id
                 print("seq first file name ", img)
@@ -189,9 +200,10 @@ def generate_coco_from_custom(split_name='train', seqs_names=None,
                                           "first_frame_image_id": first_frame_image_id})
 
             orig_image_name_to_parsed_image_id[img] = img_id
-            if i == 0 :
-                print(annotations['images'][-1]) # peek last parsed image_annot
-                print("orig_img_name",img, "img_id:", img_id)
+            if i == 0:
+                # peek last parsed image_annot
+                print(annotations['images'][-1])
+                print("orig_img_name", img, "img_id:", img_id)
             img_id += 1
 
             os.symlink(os.path.join(os.getcwd(), root_split_path, seq, 'img1', img),
@@ -200,20 +212,21 @@ def generate_coco_from_custom(split_name='train', seqs_names=None,
     annotation_id = 0
 
     # GT FILE
-    gt_file_path = os.path.join(Path(root_split_path).parents[0], 'coco_gt', 'coco.json')
+    gt_file_path = os.path.join(
+        Path(root_split_path).parents[0], 'coco_gt', 'coco.json')
     print("gt_file_path", gt_file_path)
     if flir_adas_v2:
         gt_file_path = os.path.join(
-            Path(root_split_path).parents[0], 
-            'coco_gt', 
+            Path(root_split_path).parents[0],
+            'coco_gt',
             'coco.json')
     if flir_adas_v2_thermal:
         gt_file_path = os.path.join(
-            Path(root_split_path).parents[0], 
-            'coco_gt_t', 
+            Path(root_split_path).parents[0],
+            'coco_gt_t',
             'coco.json')
     nan_track_id_count = 0
-    for seq in seqs:       
+    for seq in seqs:
         if not os.path.isfile(gt_file_path):
             continue
 
@@ -225,19 +238,20 @@ def generate_coco_from_custom(split_name='train', seqs_names=None,
             # sorting된 시퀀스 내에서 sorting된 frame_id는 이름의 인덱스가 됨
             # -> (frame_id와 seq)를 key로 image name to image_id를 추출할 수 있음
             # flir_adas_v2의 annotation에서는 img_id가 존재
-            # 오리지널 images annotation을 참조, 
+            # 오리지널 images annotation을 참조,
             # img_id로부터 img 이름을 얻고 seq에 포함되지 않으면 filter out하고 나머지만 parse
-                
+
             orig_image_id_to_image_name = {
-                            img_dict['id']: img_dict['file_name']
-                            for img_dict in annot_json_data['images']}
+                img_dict['id']: img_dict['file_name']
+                for img_dict in annot_json_data['images']}
             # change annotation id to 0-based index.
             # don't ignore items
             # visibility set to 1
             # add sequence name field
             print_first = True
             for annot in annot_json_data['annotations']:
-                image_name = orig_image_id_to_image_name.get(annot['image_id'], None)
+                image_name = orig_image_id_to_image_name.get(
+                    annot['image_id'], None)
                 if image_name:
                     image_seq = image_name[5:28]
                 if seq != image_seq:
@@ -245,18 +259,20 @@ def generate_coco_from_custom(split_name='train', seqs_names=None,
                 if print_first:
                     print("first annot", annot)
                     print("first annotation of the seq:", image_seq)
-                    print("annot['image_id']: ",annot['image_id'])
-                    print("orig_image_id_to_image_name[annot['image_id]]: ",orig_image_id_to_image_name[annot['image_id']] )
+                    print("annot['image_id']: ", annot['image_id'])
+                    print("orig_image_id_to_image_name[annot['image_id]]: ",
+                          orig_image_id_to_image_name[annot['image_id']])
                     print_first = False
-                
-                image_id = orig_image_name_to_parsed_image_id.get(image_name[5:], None)
+
+                image_id = orig_image_name_to_parsed_image_id.get(
+                    image_name[5:], None)
                 if image_id is None:
                     continue
 
                 if 'track_id' in annot:
                     annotation = {
-                        "id" : annotation_id,
-                        "bbox":annot['bbox'],
+                        "id": annotation_id,
+                        "bbox": annot['bbox'],
                         "image_id": image_id,
                         "segmentation": annot['segmentation'],
                         "ignore": 0 if annot['category_id'] else 1,
@@ -265,13 +281,13 @@ def generate_coco_from_custom(split_name='train', seqs_names=None,
                         "iscrowd": 1 if annot['iscrowd'] else 0,
                         "seq": image_seq,
                         "category_id": coco_orig_category_id_to_sorted_order_dict[annot['category_id']],
-                        "track_id": annot['track_id']+1} # track_id는 1부터 시작함
-                else:     
+                        "track_id": annot['track_id']+1}  # track_id는 1부터 시작함
+                else:
                     nan_track_id_count += 1
                     print("track id is nan!", nan_track_id_count)
                     print("track id == nan annotation", annot)
                     continue
-                
+
                 seq_annotations.append(annotation)
                 annotation_id += 1
                 # if frame_id not in seq_annoataions_per_frame: # needed when mots_vis = true, ignore this for now
@@ -293,48 +309,53 @@ def generate_coco_from_custom(split_name='train', seqs_names=None,
     with open(annotation_file, 'w') as anno_file:
         json.dump(annotations, anno_file, indent=4)
 
+
 if __name__ == '__main__':
 
     for item in DATA_PARSE_LIST:
-        if item =='flir_adas_v2':
+        if item == 'flir_adas_v2':
             split_names_list = ['train_coco', 'val_coco', 'test_coco']
             for split in split_names_list:
-                seqs_names_from_split = "".join([split.split('_')[0], '_sequences'])
+                seqs_names_from_split = "".join(
+                    [split.split('_')[0], '_sequences'])
                 generate_coco_from_custom(split_name=split, seqs_names=CUSTOM_SEQS_INFO_DICT[item][seqs_names_from_split],
-                                        root_split='train', flir_adas_v2=True, 
-                                        frame_range=None, 
-                                        data_root=FLIR_DATA_ROOT, save_root=FLIR_SAVE_ROOT
-                                        )
+                                          root_split='train', flir_adas_v2=True,
+                                          frame_range=None,
+                                          data_root=FLIR_DATA_ROOT, save_root=FLIR_SAVE_ROOT
+                                          )
         elif item == 'flir_adas_v2_thermal':
-            #name should match 'flir_adas_v2' split names with additional '_t'
-            split_names_list = ['train_coco_t', 'val_coco_t', 'test_coco_t']  
+            # name should match 'flir_adas_v2' split names with additional '_t'
+            split_names_list = ['train_coco_t', 'val_coco_t', 'test_coco_t']
             for split in split_names_list:
-                seqs_names_from_split = "".join([split.split('_')[0], '_sequences'])
+                seqs_names_from_split = "".join(
+                    [split.split('_')[0], '_sequences'])
                 generate_coco_from_custom(split_name=split, seqs_names=CUSTOM_SEQS_INFO_DICT[item][seqs_names_from_split],
-                                        root_split='train_t', flir_adas_v2_thermal=True, 
-                                        frame_range=None, 
-                                        data_root=FLIR_DATA_ROOT, save_root=FLIR_SAVE_ROOT
-                                        )
+                                          root_split='train_t', flir_adas_v2_thermal=True,
+                                          frame_range=None,
+                                          data_root=FLIR_DATA_ROOT, save_root=FLIR_SAVE_ROOT
+                                          )
 
         elif item == 'flir_adas_v2_small':
             data_root = "".join([FLIR_DATA_ROOT.rstrip('/'), "_small"])
             split_names_list = ['train_coco', 'val_coco', 'test_coco']
             for split in split_names_list:
-                seqs_names_from_split = "".join([split.split('_')[0], '_sequences'])
+                seqs_names_from_split = "".join(
+                    [split.split('_')[0], '_sequences'])
                 generate_coco_from_custom(split_name=split, seqs_names=CUSTOM_SEQS_INFO_DICT[item][seqs_names_from_split],
-                                        root_split='train', flir_adas_v2=True, 
-                                        frame_range=None, 
-                                        data_root=FLIR_DATA_ROOT, save_root=FLIR_SAVE_ROOT
-                                        )
-            
+                                          root_split='train', flir_adas_v2=True,
+                                          frame_range=None,
+                                          data_root=FLIR_DATA_ROOT, save_root=FLIR_SAVE_ROOT
+                                          )
+
         elif item == 'flir_adas_v2_thermal_small':
-            #name should match 'flir_adas_v2' split names with additional '_t'
+            # name should match 'flir_adas_v2' split names with additional '_t'
             data_root = "".join([FLIR_DATA_ROOT.rstrip('/'), "_small"])
-            split_names_list = ['train_coco_t', 'val_coco_t', 'test_coco_t']  
+            split_names_list = ['train_coco_t', 'val_coco_t', 'test_coco_t']
             for split in split_names_list:
-                seqs_names_from_split = "".join([split.split('_')[0], '_sequences'])
+                seqs_names_from_split = "".join(
+                    [split.split('_')[0], '_sequences'])
                 generate_coco_from_custom(split_name=split, seqs_names=CUSTOM_SEQS_INFO_DICT[item][seqs_names_from_split],
-                                        root_split='train_t', flir_adas_v2_thermal=True, 
-                                        frame_range=None, 
-                                        data_root=FLIR_DATA_ROOT, save_root=FLIR_SAVE_ROOT
-                                        )
+                                          root_split='train_t', flir_adas_v2_thermal=True,
+                                          frame_range=None,
+                                          data_root=FLIR_DATA_ROOT, save_root=FLIR_SAVE_ROOT
+                                          )
