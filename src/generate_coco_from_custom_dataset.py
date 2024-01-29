@@ -8,6 +8,7 @@ import json
 import os
 import shutil
 from pathlib import Path
+from typing import TypedDict, List
 
 import numpy as np
 import pycocotools.mask as rletools
@@ -90,14 +91,12 @@ rgb_seq_to_thermal_seq = {'video-BzZspxAweF8AnKhWK': 'video-4FRnNpmSmwktFJKjg',
 
 def generate_coco_from_custom(split_name='train', seqs_names=None,
                               root_split='train', flir_adas_v2=False, flir_adas_v2_thermal=False,
-                              frame_range=None, data_root='data/flir_adas_v2',
+                              frame_range={'start': 0.0, 'end': 1.0}, data_root='data/flir_adas_v2',
                               save_root='data/flir_adas_v2'):
     """
     Generates COCO data from CUSTOM DATA.
     """
 
-    if frame_range is None:
-        frame_range = {'start': 0.0, 'end': 1.0}
     coco_data_root = data_root
     if save_root != None:
         coco_save_root = save_root
@@ -310,52 +309,42 @@ def generate_coco_from_custom(split_name='train', seqs_names=None,
         json.dump(annotations, anno_file, indent=4)
 
 
+class CustomDatasetDict(TypedDict):
+    # CUSTOM_SEQS_INFO_DICT에 정의되어있는 데이터 셋의 이름입니다.
+    name: str
+    # 해당 데이터 셋이 열화상인지를 나타냅니다.
+    is_thermal: bool
+    # 데이터 셋의 최상위 경로입니다.
+    data_root: str
+
+
 if __name__ == '__main__':
-
-    for item in DATA_PARSE_LIST:
-        if item == 'flir_adas_v2':
-            split_names_list = ['train_coco', 'val_coco', 'test_coco']
-            for split in split_names_list:
-                seqs_names_from_split = "".join(
-                    [split.split('_')[0], '_sequences'])
-                generate_coco_from_custom(split_name=split, seqs_names=CUSTOM_SEQS_INFO_DICT[item][seqs_names_from_split],
-                                          root_split='train', flir_adas_v2=True,
-                                          frame_range=None,
-                                          data_root=FLIR_DATA_ROOT, save_root=FLIR_SAVE_ROOT
-                                          )
-        elif item == 'flir_adas_v2_thermal':
-            # name should match 'flir_adas_v2' split names with additional '_t'
+    def generate_coco_flir(name,
+                           is_thermal=False,
+                           data_root=FLIR_DATA_ROOT,
+                           frame_range={'start': 0.0, 'end': 1.0}):
+        if is_thermal:
             split_names_list = ['train_coco_t', 'val_coco_t', 'test_coco_t']
-            for split in split_names_list:
-                seqs_names_from_split = "".join(
-                    [split.split('_')[0], '_sequences'])
-                generate_coco_from_custom(split_name=split, seqs_names=CUSTOM_SEQS_INFO_DICT[item][seqs_names_from_split],
-                                          root_split='train_t', flir_adas_v2_thermal=True,
-                                          frame_range=None,
-                                          data_root=FLIR_DATA_ROOT, save_root=FLIR_SAVE_ROOT
-                                          )
-
-        elif item == 'flir_adas_v2_small':
-            data_root = "".join([FLIR_DATA_ROOT.rstrip('/'), "_small"])
+            root_split = 'train_t'
+        else:
             split_names_list = ['train_coco', 'val_coco', 'test_coco']
-            for split in split_names_list:
-                seqs_names_from_split = "".join(
-                    [split.split('_')[0], '_sequences'])
-                generate_coco_from_custom(split_name=split, seqs_names=CUSTOM_SEQS_INFO_DICT[item][seqs_names_from_split],
-                                          root_split='train', flir_adas_v2=True,
-                                          frame_range=None,
-                                          data_root=FLIR_DATA_ROOT, save_root=FLIR_SAVE_ROOT
-                                          )
+            root_split = 'train'
 
-        elif item == 'flir_adas_v2_thermal_small':
-            # name should match 'flir_adas_v2' split names with additional '_t'
-            data_root = "".join([FLIR_DATA_ROOT.rstrip('/'), "_small"])
-            split_names_list = ['train_coco_t', 'val_coco_t', 'test_coco_t']
-            for split in split_names_list:
-                seqs_names_from_split = "".join(
-                    [split.split('_')[0], '_sequences'])
-                generate_coco_from_custom(split_name=split, seqs_names=CUSTOM_SEQS_INFO_DICT[item][seqs_names_from_split],
-                                          root_split='train_t', flir_adas_v2_thermal=True,
-                                          frame_range=None,
-                                          data_root=FLIR_DATA_ROOT, save_root=FLIR_SAVE_ROOT
-                                          )
+        for splited_name in split_names_list:
+            seqs_names_from_splited_name = "".join(
+                [splited_name.split('_')[0], '_sequences'])
+            generate_coco_from_custom(split_name=splited_name,
+                                      seqs_names=CUSTOM_SEQS_INFO_DICT[name][seqs_names_from_splited_name],
+                                      root_split=root_split,
+                                      flir_adas_v2_thermal=True,
+                                      frame_range=frame_range,
+                                      data_root=data_root,
+                                      save_root=FLIR_SAVE_ROOT)
+
+    with open('./src/coco_parser_custom.json') as f:
+        parse_list: List[CustomDatasetDict] = json.load(f)
+
+    for payload in parse_list:
+        generate_coco_flir(name=payload['name'],
+                           is_thermal=payload['is_thermal'],
+                           data_root=payload['data_root'])
