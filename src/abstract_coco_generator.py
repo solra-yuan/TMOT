@@ -20,6 +20,7 @@ def load_sequence_config(config_file_path):
 
     return img_width, img_height, seq_length
 
+
 def calculate_max_objects_per_image(annotations: List[Dict]) -> int:
     """
     Calculates the maximum number of objects (annotations) per image.
@@ -40,6 +41,7 @@ def calculate_max_objects_per_image(annotations: List[Dict]) -> int:
 
     max_objs = max(num_objs_per_image.values(), default=0)
     return max_objs
+
 
 class AbstractCocoGenerator(ABC):
     def __init__(
@@ -78,7 +80,7 @@ class AbstractCocoGenerator(ABC):
         }
 
         self.orig_image_name_to_parsed_image_id = {}
-    
+
     def __create_coco_directories(self):
         import shutil
         coco_dir = os.path.join(self.save_root, self.split_name)
@@ -91,12 +93,17 @@ class AbstractCocoGenerator(ABC):
             os.mkdir(annotations_dir)
 
         return coco_dir, annotations_dir
-   
-    def __generate_coco_structure(self, sequences):
+
+    def __generate_coco_structure(
+            self,
+            images,
+            annotations,
+            sequences,
+    ):
         return {
             'type': 'instances',
-            'images': [],
-            'annotations': [],
+            'images': images,
+            'annotations': annotations,
             'sequences': sequences,
             'frame_range': self.frame_range,
             'categories': [
@@ -111,7 +118,7 @@ class AbstractCocoGenerator(ABC):
                 {'id': 9, 'name': 'other vehicle', 'supercategory': 'unknown'},
                 {'id': 10, 'name': 'dog', 'supercategory': 'unknown'}]
         }
-        
+
     def __load_gt_file_data(self):
         from pathlib import Path
 
@@ -170,12 +177,13 @@ class AbstractCocoGenerator(ABC):
                 self.orig_image_name_to_parsed_image_id[img] = img_id
                 img_id += 1
 
-                originPath = os.path.join(self.dataset_base_path, seq, 'img1', img)
+                originPath = os.path.join(
+                    self.dataset_base_path, seq, 'img1', img)
                 symlinkPath = os.path.join(coco_dir, f"{seq}_{img}")
                 os.symlink(originPath, symlinkPath)
 
         return images
-    
+
     def __process_annotations(self, annot_json_data, seqs):
         """
         Processes annotations for given sequences. Filters and transforms annotation data based on the sequences.
@@ -211,7 +219,7 @@ class AbstractCocoGenerator(ABC):
 
                 image_id = self.orig_image_name_to_parsed_image_id.get(
                     image_name[5:],
-                   None
+                    None
                 )
 
                 if image_id is not None:
@@ -238,7 +246,7 @@ class AbstractCocoGenerator(ABC):
                         print("track id == nan annotation", annot)
 
         return processed_annotations
-    
+
     @abstractmethod
     def generate_sequences(self):
         pass
@@ -248,21 +256,28 @@ class AbstractCocoGenerator(ABC):
 
         print(self.split_name, seqs)
 
-        coco_structure = self.__generate_coco_structure(seqs)
 
         coco_dir, annotations_dir = self.__create_coco_directories()
-        coco_structure['images'] = self.__process_images_for_coco(coco_dir, seqs)
+        images = self.__process_images_for_coco(
+            coco_dir, seqs)
 
         annot_json_data = self.__load_gt_file_data()
-        coco_structure['annotations'] = self.__process_annotations(
-           annot_json_data,
-           seqs,
+        annotations = self.__process_annotations(
+            annot_json_data,
+            seqs,
         )
 
+        coco_structure = self.__generate_coco_structure(
+            images,
+            annotations,
+            seqs
+        )
+        
         max_objs_per_image = calculate_max_objects_per_image(
             coco_structure['annotations'])
         print(f'max objs per image: {max_objs_per_image}')
 
-        annotation_file = os.path.join(annotations_dir, f'{self.split_name}.json')
+        annotation_file = os.path.join(
+            annotations_dir, f'{self.split_name}.json')
         with open(annotation_file, 'w') as anno_file:
             json.dump(coco_structure, anno_file, indent=4)
