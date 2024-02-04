@@ -112,7 +112,7 @@ class AbstractCocoGenerator(ABC):
                 {'id': 10, 'name': 'dog', 'supercategory': 'unknown'}]
         }
         
-    def __load_annotation_data(self):
+    def __load_gt_file_data(self):
         from pathlib import Path
 
         # Construct the full path to the JSON file
@@ -244,15 +244,16 @@ class AbstractCocoGenerator(ABC):
         pass
 
     def generate(self):
-        coco_dir, annotations_dir = self.__create_coco_directories()
-        annotation_file = os.path.join(annotations_dir, f'{self.split_name}.json')
         seqs = self.generate_sequences()
-        annot_json_data = self.__load_annotation_data()
 
         print(self.split_name, seqs)
 
         coco_structure = self.__generate_coco_structure(seqs)
+
+        coco_dir, annotations_dir = self.__create_coco_directories()
         coco_structure['images'] = self.__process_images_for_coco(coco_dir, seqs)
+
+        annot_json_data = self.__load_gt_file_data()
         coco_structure['annotations'] = self.__process_annotations(
            annot_json_data,
            seqs,
@@ -262,5 +263,6 @@ class AbstractCocoGenerator(ABC):
             coco_structure['annotations'])
         print(f'max objs per image: {max_objs_per_image}')
 
+        annotation_file = os.path.join(annotations_dir, f'{self.split_name}.json')
         with open(annotation_file, 'w') as anno_file:
             json.dump(coco_structure, anno_file, indent=4)
