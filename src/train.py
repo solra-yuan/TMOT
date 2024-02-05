@@ -20,25 +20,29 @@ from trackformer.util.misc import nested_dict_to_namespace
 from trackformer.util.plot_utils import get_vis_win_names
 from trackformer.vis import build_visualizers
 
-# 실험 환경설정 변수 제어. sacred(실험 reproducing 제어) init, 
-# 커맨드라인 입력 처리(데이터셋, 모델 동작 제어 옵션ㅡdeformable, tracking, multiframe, full resolution 등) 
+# 실험 환경설정 변수 제어. sacred(실험 reproducing 제어) init,
+# 커맨드라인 입력 처리(데이터셋, 모델 동작 제어 옵션ㅡdeformable, tracking, multiframe, full resolution 등)
 ex = sacred.Experiment('train')
 ex.add_config('cfgs/train.yaml')
-ex.add_named_config('deformable', 'cfgs/train_deformable.yaml') #
-ex.add_named_config('tracking', 'cfgs/train_tracking.yaml') #
+ex.add_named_config('deformable', 'cfgs/train_deformable.yaml')
+ex.add_named_config('tracking', 'cfgs/train_tracking.yaml')
 ex.add_named_config('crowdhuman', 'cfgs/train_crowdhuman.yaml')
 ex.add_named_config('mot_coco_person', 'cfgs/train_mot_coco_person.yaml')
 ex.add_named_config('mot17_crowdhuman', 'cfgs/train_mot17_crowdhuman.yaml')
-ex.add_named_config('mot17', 'cfgs/train_mot17.yaml') #
+ex.add_named_config('mot17', 'cfgs/train_mot17.yaml')
 ex.add_named_config('mots20', 'cfgs/train_mots20.yaml')
 ex.add_named_config('mot20_crowdhuman', 'cfgs/train_mot20_crowdhuman.yaml')
 ex.add_named_config('coco_person_masks', 'cfgs/train_coco_person_masks.yaml')
 ex.add_named_config('full_res', 'cfgs/train_full_res.yaml')
-ex.add_named_config('multi_frame', 'cfgs/train_multi_frame.yaml') #
-ex.add_named_config('flir_adas_v2', 'cfgs/train_flir_adas_v2_mot17_copy.yaml') # add custom config
-ex.add_named_config('flir_adas_v2_thermal', 'cfgs/train_flir_adas_v2_thermal.yaml') # add custom config
-ex.add_named_config('flir_adas_v2_concat', 'cfgs/train_flir_adas_v2_concat.yaml') #add custom confi
-ex.add_named_config('flir_adas_v2_crowdhuman','cfgs/train_mot17_crowdhuman.yaml') 
+ex.add_named_config('multi_frame', 'cfgs/train_multi_frame.yaml')
+# add custom config
+ex.add_named_config('flir_adas_v2', 'cfgs/train_flir_adas_v2_mot17_copy.yaml')
+ex.add_named_config('flir_adas_v2_thermal',
+                    'cfgs/train_flir_adas_v2_thermal.yaml')  # add custom config
+ex.add_named_config('flir_adas_v2_concat',
+                    'cfgs/train_flir_adas_v2_concat.yaml')  # add custom confi
+ex.add_named_config('flir_adas_v2_crowdhuman',
+                    'cfgs/train_mot17_crowdhuman.yaml')
 # # original training code of Trackformer crowdhuman pre-training
 
 # python src/train.py with \
@@ -115,7 +119,6 @@ ex.add_named_config('flir_adas_v2_crowdhuman','cfgs/train_mot17_crowdhuman.yaml'
 #     epochs=1 \
 
 
-
 def train(args: Namespace) -> None:
     print(args)
 
@@ -126,12 +129,11 @@ def train(args: Namespace) -> None:
         # args.tracking_eval = False
         args.num_workers = 0
 
+    if args.tracking_eval == 'false':
+        args.tracking_eval = False
+
     if not args.deformable:
         assert args.num_feature_levels == 1
-    if args.tracking:
-        # assert args.batch_size == 1
-        if args.tracking_eval:
-            assert 'mot' in args.dataset
 
     output_dir = Path(args.output_dir)
     if args.output_dir:
@@ -140,6 +142,8 @@ def train(args: Namespace) -> None:
         yaml.dump(
             vars(args),
             open(output_dir / 'config.yaml', 'w'), allow_unicode=True)
+
+    print(args)
 
     device = torch.device(args.device)
 
@@ -167,7 +171,8 @@ def train(args: Namespace) -> None:
         model = torch.nn.parallel.DistributedDataParallel(
             model, device_ids=[args.gpu], find_unused_parameters=True)
         model_without_ddp = model.module
-    n_parameters = sum(p.numel() for p in model.parameters() if p.requires_grad)
+    n_parameters = sum(p.numel()
+                       for p in model.parameters() if p.requires_grad)
     print('NUM TRAINABLE MODEL PARAMS:', n_parameters)
 
     def match_name_keywords(n, name_keywords):
@@ -181,7 +186,7 @@ def train(args: Namespace) -> None:
     param_dicts = [
         {"params": [p for n, p in model_without_ddp.named_parameters()
                     if not match_name_keywords(n, args.lr_backbone_names + args.lr_linear_proj_names + ['layers_track_attention']) and p.requires_grad],
-         "lr": args.lr,},
+         "lr": args.lr, },
         {"params": [p for n, p in model_without_ddp.named_parameters()
                     if match_name_keywords(n, args.lr_backbone_names) and p.requires_grad],
          "lr": args.lr_backbone},
@@ -197,7 +202,8 @@ def train(args: Namespace) -> None:
     optimizer = torch.optim.AdamW(param_dicts, lr=args.lr,
                                   weight_decay=args.weight_decay)
 
-    lr_scheduler = torch.optim.lr_scheduler.MultiStepLR(optimizer, [args.lr_drop])
+    lr_scheduler = torch.optim.lr_scheduler.MultiStepLR(
+        optimizer, [args.lr_drop])
 
     dataset_train = build_dataset(split='train', args=args)
     dataset_val = build_dataset(split='val', args=args)
@@ -275,7 +281,8 @@ def train(args: Namespace) -> None:
                 #     else:
                 #         raise NotImplementedError
                 elif 'linear2' in k or 'input_proj' in k:
-                    resume_value = checkpoint_value.repeat((2,) + (num_dims - 1) * (1, ))
+                    resume_value = checkpoint_value.repeat(
+                        (2,) + (num_dims - 1) * (1, ))
                 elif 'class_embed' in k:
                     # person and no-object class
                     # resume_value = checkpoint_value[[1, -1]]
@@ -285,7 +292,8 @@ def train(args: Namespace) -> None:
                     # resume_value = v
                     # print(f'Load {k} {tuple(v.shape)} from scratch.')
                 else:
-                    raise NotImplementedError(f"No rule for {k} with shape {v.shape}.")
+                    raise NotImplementedError(
+                        f"No rule for {k} with shape {v.shape}.")
 
                 print(f"Load {k} {tuple(v.shape)} from resume model "
                       f"{tuple(checkpoint_value.shape)}.")
@@ -313,7 +321,7 @@ def train(args: Namespace) -> None:
             for k, v in resume_state_dict.items():
 
                 if (('bbox_attention' in k or 'mask_head' in k)
-                    and v.shape == checkpoint_mask_head['model'][k].shape):
+                        and v.shape == checkpoint_mask_head['model'][k].shape):
                     print(f'Load {k} {tuple(v.shape)} from mask head model.')
                     resume_state_dict[k] = checkpoint_mask_head['model'][k]
 
@@ -350,7 +358,8 @@ def train(args: Namespace) -> None:
             model, criterion, postprocessors, data_loader_val, device,
             output_dir, visualizers['val'], args, 0)
         if args.output_dir:
-            utils.save_on_master(coco_evaluator.coco_eval["bbox"].eval, output_dir / "eval.pth")
+            utils.save_on_master(
+                coco_evaluator.coco_eval["bbox"].eval, output_dir / "eval.pth")
 
         return
 
@@ -388,9 +397,11 @@ def train(args: Namespace) -> None:
             #     checkpoint_paths.append(output_dir / f'checkpoint{epoch:04}.pth')
 
             # checkpoint for best validation stats
-            stat_names = ['BBOX_AP_IoU_0_50-0_95', 'BBOX_AP_IoU_0_50', 'BBOX_AP_IoU_0_75']
+            stat_names = ['BBOX_AP_IoU_0_50-0_95',
+                          'BBOX_AP_IoU_0_50', 'BBOX_AP_IoU_0_75']
             if args.masks:
-                stat_names.extend(['MASK_AP_IoU_0_50-0_95', 'MASK_AP_IoU_0_50', 'MASK_AP_IoU_0_75'])
+                stat_names.extend(
+                    ['MASK_AP_IoU_0_50-0_95', 'MASK_AP_IoU_0_50', 'MASK_AP_IoU_0_75'])
             if args.tracking and args.tracking_eval:
                 stat_names.extend(['MOTA', 'IDF1'])
 
@@ -401,12 +412,14 @@ def train(args: Namespace) -> None:
                                                          val_stats)]
             for b_s, s, n in zip(best_val_stats, val_stats, stat_names):
                 if b_s == s:
-                    checkpoint_paths.append(output_dir / f"checkpoint_best_{n}.pth")
+                    checkpoint_paths.append(
+                        output_dir / f"checkpoint_best_{n}.pth")
 
         # MODEL SAVING
         if args.output_dir:
             if args.save_model_interval and not epoch % args.save_model_interval:
-                checkpoint_paths.append(output_dir / f"checkpoint_epoch_{epoch}.pth")
+                checkpoint_paths.append(
+                    output_dir / f"checkpoint_epoch_{epoch}.pth")
 
             for checkpoint_path in checkpoint_paths:
                 utils.save_on_master({
