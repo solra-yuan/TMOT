@@ -43,6 +43,17 @@ def calculate_max_objects_per_image(annotations: List[Dict]) -> int:
     return max_objs
 
 
+class FrameRrangeDict(TypedDict):
+    """
+    FrameRrangeDict 대한 설명을 작성해주세요.
+    """
+
+    # start에 대한 설명을 작성해주세요.
+    start: float
+    # end에 대한 설명을 작성해주세요.
+    end: float
+
+
 class AbstractCocoGenerator(ABC):
     def __init__(
         self,

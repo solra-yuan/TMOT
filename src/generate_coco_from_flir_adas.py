@@ -1,32 +1,57 @@
-
+import argparse
 import json
+import os
 from typing import TypedDict
 from FlirCocoGenerator import FlirCocoGenerator
 from FlirThermalCocoGenerator import FlirThermalCocoGenerator
+from abstract_coco_generator import FrameRangeDict
+try:
+    from dotenv import load_dotenv, find_dotenv
+    load_dotenv(find_dotenv('.env.local'))
+except:
+    pass
+
+parser = argparse.ArgumentParser(description='Argparse Example')
+
+parser.add_argument('--data_root',
+                    type=str,
+                    default=os.environ.get(
+                        "FLIR_DATA_ROOT") or 'data/flir_adas_v2/',
+                    help='Example number')
+
+parser.add_argument('--save_root',
+                    type=str,
+                    default=os.environ.get(
+                        "FLIR_SAVE_ROOT") or 'data/flir_adas_v2/',
+                    help='Example number')
+
+args = parser.parse_args()
+# 기존 data가 저장되어 있는 위치
+FLIR_DATA_ROOT = args.data_root
+# 파싱 후 data가 저장될 루트 위치
+FLIR_SAVE_ROOT = args.save_root
 
 
 class CustomDatasetDict(TypedDict):
     """
-    CustomDatasetDict에 대한 설명을 작성해주세요.
+    Defines the properties of the datasets that will be parsed.
     """
 
-    # CUSTOM_SEQS_INFO_DICT에 정의되어있는 데이터 셋의 이름입니다.
+    '''
+        The name of dataset which is defined in coco_parser_custom.json.
+        Also, the name must be included in DATA_PARSE_LIST.
+    '''
     name: str
-    # 해당 데이터 셋이 열화상인지를 나타냅니다.
+
+    """
+        Whether the dataset is thermal dataset or not. 
+        if is_thermal is true, the dataset is thermal image.
+        if is_thermal is false, the dataset is RGB image.
+
+    """
     is_thermal: bool
-    # 데이터 셋의 최상위 경로입니다.
+    # The root directory of the dataset.
     data_root: str
-
-
-class FrameRrangeDict(TypedDict):
-    """
-    FrameRrangeDict 대한 설명을 작성해주세요.
-    """
-
-    # start에 대한 설명을 작성해주세요.
-    start: float
-    # end에 대한 설명을 작성해주세요.
-    end: float
 
 
 DATA_PARSE_LIST = [
@@ -36,10 +61,6 @@ DATA_PARSE_LIST = [
     'flir_adas_v2_thermal_small'
 ]
 
-# 기존 data가 저장되어 있는 위치
-FLIR_DATA_ROOT = '/mnt/y/Datasets/flir_adas_v2/'
-# 파싱 후 data가 저장될 루트 위치
-FLIR_SAVE_ROOT = '/mnt/y/Datasets/flir_adas_v2/'
 dataset_base_path = '/mnt/y/Datasets/flir_adas_v2'
 VIS_THRESHOLD = 0.25  # 데이터 추가 정제가 필요할 경우 vis threshold 이하의 아이템은 버리는 방향으로 구현
 
@@ -98,7 +119,7 @@ if __name__ == '__main__':
         name: str,
         is_thermal: bool = False,
         data_root: str = FLIR_DATA_ROOT,
-        frame_range: FrameRrangeDict = {'start': 0.0, 'end': 1.0}
+        frame_range: FrameRangeDict = {'start': 0.0, 'end': 1.0}
     ):
 
         if is_thermal:
