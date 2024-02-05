@@ -8,7 +8,7 @@ from abstract_coco_generator import FrameRangeDict
 try:
     from dotenv import load_dotenv, find_dotenv
     load_dotenv(find_dotenv('.env.local'))
-except:
+except ImportError:
     pass
 
 parser = argparse.ArgumentParser(description='Argparse Example')
