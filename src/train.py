@@ -130,9 +130,7 @@ def train(args: Namespace) -> None:
         assert args.num_feature_levels == 1
     if args.tracking:
         # assert args.batch_size == 1
-        if args.dataset == 'flir_adas_v2':
-            args.tracking_eval = True  #todo : tracking evaluation code- look into factory.py
-        elif args.tracking_eval:
+        if args.tracking_eval:
             assert 'mot' in args.dataset
 
     output_dir = Path(args.output_dir)
