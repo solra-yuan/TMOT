@@ -26,9 +26,9 @@ parser.add_argument('--save_root',
                     help='Example number')
 
 args = parser.parse_args()
-# 기존 data가 저장되어 있는 위치
+# The root directory of the original dataset before parsing
 FLIR_DATA_ROOT = args.data_root
-# 파싱 후 data가 저장될 루트 위치
+# The dataset is saved in the directory after generated as coco tracking format
 FLIR_SAVE_ROOT = args.save_root
 
 
@@ -37,21 +37,24 @@ class CustomDatasetDict(TypedDict):
     Defines the properties of the datasets that will be parsed.
     """
 
+    name: str
     '''
         The name of dataset which is defined in coco_parser_custom.json.
         Also, the name must be included in DATA_PARSE_LIST.
     '''
-    name: str
 
-    """
+    is_thermal: bool
+    '''
         Whether the dataset is thermal dataset or not. 
         if is_thermal is true, the dataset is thermal image.
         if is_thermal is false, the dataset is RGB image.
 
-    """
-    is_thermal: bool
-    # The root directory of the dataset.
-    data_root: str
+    '''
+
+    data_root: str 
+    '''
+        The root directory of the dataset.
+    '''
 
 
 DATA_PARSE_LIST = [
@@ -62,7 +65,7 @@ DATA_PARSE_LIST = [
 ]
 
 dataset_base_path = '/mnt/y/Datasets/flir_adas_v2'
-VIS_THRESHOLD = 0.25  # 데이터 추가 정제가 필요할 경우 vis threshold 이하의 아이템은 버리는 방향으로 구현
+VIS_THRESHOLD = 0.25 
 
 # add custom sequence info here
 CUSTOM_SEQS_INFO_DICT = {}

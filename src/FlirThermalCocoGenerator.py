@@ -30,16 +30,16 @@ class FlirThermalCocoGenerator(AbstractCocoGenerator):
     def generate_sequences(self):
         import os
 
-        # root_split_path에서 정렬된 이름.
+        # File name list at root_split_path
         seq_root_split_path = os.path.join(
             self.data_root,
             self.root_split.split('_')[0]
         )
 
         print("seq_root_split_path", seq_root_split_path)
-        # root_split_path에서 정렬된 이름.
-        seqs = sorted(os.listdir(seq_root_split_path))
-        # thermal-rgb는 같은 순서대로 파싱함
+        seqs = sorted(os.listdir(seq_root_split_path))  # Sort file name list 
+
+        # Parse thermal-rgb based on order of sorted RGB seq list
         seqs = [self.rgb_seq_to_thermal_seq[se] for se in seqs]
 
         if self.seqs_names is not None:

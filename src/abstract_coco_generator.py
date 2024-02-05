@@ -43,16 +43,30 @@ def calculate_max_objects_per_image(annotations: List[Dict]) -> int:
     return max_objs
 
 
-class FrameRrangeDict(TypedDict):
+class FrameRangeDict(TypedDict):
     """
-    FrameRrangeDict 대한 설명을 작성해주세요.
+    `FrameRangeDict` is a type used to denote a specific frame range in video or sequence data.
+    This structure includes a starting frame (`start`) and 
+    an ending frame (`end`) for processing data within the specified range.
     """
+    
 
-    # start에 대한 설명을 작성해주세요.
     start: float
-    # end에 대한 설명을 작성해주세요.
-    end: float
+    '''
+    `start` is a float value that represents the start of the range. 
+    This value typically represents a relative position with respect to the total length of the data.
+    For example, `start` being 0.0 means the range starts at the beginning of the data, 
+    and 0.5 indicates that the range starts from the midpoint of the data.
+    '''
 
+    end: float
+    '''
+    `end` is a float value that represents the end of the range. 
+    Similarly, this value represents a relative position with respect to the total length of the data.
+    For example, `end` being 1.0 means the range includes up to the end of the data, 
+    and 0.5 indicates that the range includes up to the midpoint of the data.
+    '''
+   
 
 class AbstractCocoGenerator(ABC):
     def __init__(
@@ -148,7 +162,7 @@ class AbstractCocoGenerator(ABC):
 
     def __process_images_for_coco(self, coco_dir, seqs):
 
-        img_id = 0  # 모든 시퀀스 대해 통합된 image id임
+        img_id = 0  # unified image id across all sequences
 
         images = []
 
@@ -197,7 +211,8 @@ class AbstractCocoGenerator(ABC):
 
     def __process_annotations(self, annot_json_data, seqs):
         """
-        Processes annotations for given sequences. Filters and transforms annotation data based on the sequences.
+        Processes annotations for given sequences. 
+        Filters and transforms annotation data based on the sequences.
 
         Args:
             seqs: List of sequences to process.
