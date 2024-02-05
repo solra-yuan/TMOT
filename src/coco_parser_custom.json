@@ -1,0 +1,22 @@
+[
+    {
+        "name": "flir_adas_v2",
+        "is_thermal": false,
+        "data_root": "/mnt/y/Datasets/flir_adas_v2"
+    },
+    {
+        "name": "flir_adas_v2_thermal",
+        "is_thermal": true,
+        "data_root": "/mnt/y/Datasets/flir_adas_v2"
+    },
+    {
+        "name": "flir_adas_v2_small",
+        "is_thermal": false,
+        "data_root": "/mnt/y/Datasets/flir_adas_v2_small"
+    },
+    {
+        "name": "flir_adas_v2_thermal_small",
+        "is_thermal": true,
+        "data_root": "/mnt/y/Datasets/flir_adas_v2_small"
+    }
+]
