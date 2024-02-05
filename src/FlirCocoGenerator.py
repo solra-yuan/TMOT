@@ -8,7 +8,7 @@ class FlirCocoGenerator(AbstractCocoGenerator):
     def generate_sequences(self):
         import os
 
-        # root_split_path에서 정렬된 이름.
+        # sorted flie name list
         seqs = sorted(os.listdir(self.root_split_path))
 
         if self.seqs_names is not None:
