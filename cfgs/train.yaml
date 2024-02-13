@@ -131,9 +131,9 @@ world_size: 1
 # url used to set up distributed training
 dist_url: env://
 # Visdom params
-# vis_server: http://localhost
-vis_server: ''
-vis_port: 8090
+vis_server: http://localhost
+# vis_server: ''
+vis_port: 8097
 vis_and_log_interval: 50
 no_vis: false
 

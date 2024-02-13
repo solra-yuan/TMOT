@@ -183,15 +183,19 @@ def vis_results(visualizer, img, result, target, tracking):
 
     query_keep = keep
     if tracking:
-        query_keep = keep[target['track_queries_mask'] == 0]
+        track_queries_mask = target['track_queries_mask'].to(keep.device)
+        query_keep = keep[track_queries_mask == 0]
 
     legend_handles = [mpatches.Patch(
         color='green',
         label=f"object queries ({query_keep.sum()}/{len(target['boxes']) - num_track_queries_with_id})\n- cls_score")]
 
     if num_track_queries:
+        track_queries_mask = target['track_queries_mask'].to(keep.device)
+        track_queries_fal_pos_mask = target['track_queries_fal_pos_mask'].to(keep.device)
+
         track_queries_label = (
-            f"track queries ({keep[target['track_queries_mask']].sum() - keep[target['track_queries_fal_pos_mask']].sum()}"
+            f"track queries ({keep[track_queries_mask].sum() - keep[track_queries_fal_pos_mask].sum()}"
             f"/{num_track_queries_with_id})\n- track_id\n- cls_score\n- iou")
 
         legend_handles.append(mpatches.Patch(
@@ -199,8 +203,9 @@ def vis_results(visualizer, img, result, target, tracking):
             label=track_queries_label))
 
     if num_track_queries_with_id != num_track_queries:
+        track_queries_fal_pos_mask = target['track_queries_fal_pos_mask'].to(keep.device)
         track_queries_fal_pos_label = (
-            f"false track queries ({keep[target['track_queries_fal_pos_mask']].sum()}"
+            f"false track queries ({keep[track_queries_fal_pos_mask].sum()}"
             f"/{num_track_queries - num_track_queries_with_id})")
 
         legend_handles.append(mpatches.Patch(

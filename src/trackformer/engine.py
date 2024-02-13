@@ -86,8 +86,11 @@ def make_results(outputs, targets, postprocessors, tracking, return_only_orig=Tr
             if 'track_query_match_ids' in target and len(target['track_query_match_ids']):
                 print("target['boxes']", target['boxes'], "device", target['boxes'].device)
                 print("target['track_query_match_ids']", target['track_query_match_ids'], target['track_query_match_ids'].device)
+
+                track_query_match_ids = target['track_query_match_ids'].to(target['boxes'].device)
+
                 track_queries_iou, _ = box_iou(
-                    target['boxes'][target['track_query_match_ids']],
+                    target['boxes'][track_query_match_ids],
                     result['boxes'])
 
                 box_ids = [box_id
