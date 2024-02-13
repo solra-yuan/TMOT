@@ -98,7 +98,86 @@ class ImgVis(BaseVis):
         self.viz.save([self.viz.env])
 
 
+def draw_track_id(ax, x, y, track_id, fontsize=10, bbox=dict(facecolor='white', alpha=0.5)):
+    """Displays the tracking ID on the graphic."""
+    ax.text(x, y, f"track_id={track_id}", fontsize=fontsize, bbox=bbox)
+
+
+def draw_rectangle(ax, x1, y1, x2, y2, fill=False, color='green', linewidth=2):
+    """Draws a rectangle on the graphic."""
+    ax.add_patch(plt.Rectangle(
+        (x1, y1),
+        x2 - x1,
+        y2 - y1,
+        fill=fill,
+        color=color,
+        linewidth=linewidth
+    ))
+
+def draw_mask(ax, mask, cmap, alpha=0.5):
+    """
+    Displays the mask on the graphic.
+    
+    Parameters:
+    - ax: The matplotlib axes to draw on.
+    - mask: The mask data to visualize.
+    - cmap: The colormap instance or a color string to use for the mask.
+    - alpha: The alpha blending value, between 0 (transparent) and 1 (opaque).
+    """
+    masked_mask = np.ma.masked_where(mask == 0.0, mask)
+    ax.imshow(masked_mask, alpha=alpha, cmap=cmap)
+
+
+def vis_previous_frames(ax, frame_target, get_cmap):
+    """
+    Visualizes previous frames with tracking IDs, bounding boxes, and masks.
+    
+    Parameters:
+    - ax: The matplotlib axes to draw on.
+    - frame_target: A dictionary containing 'track_ids', 'boxes', and optionally 'masks'.
+    - get_cmap: A function that takes an index and returns a colormap.
+    """
+    for j, track_id in enumerate(frame_target['track_ids']):
+        x1, y1, x2, y2 = frame_target['boxes'][j]
+        draw_track_id(ax, x1, y1, track_id)
+        draw_rectangle(ax, x1, y1, x2, y2)
+
+        if 'masks' in frame_target:
+            mask = frame_target['masks'][j].cpu().numpy()
+            cmap = get_cmap(j)  # Assuming get_cmap returns a colormap for the current index.
+            draw_mask(ax, mask, cmap)
+
+def visualize_frame_targets(axarr, target, frame_prefixes=['prev', 'prev_prev']):
+    """
+    Visualizes the tracking information for previous frames.
+
+    Parameters:
+    - axarr: The array of axes objects to draw the visualizations on.
+    - target: The target dictionary containing tracking information.
+    - frame_prefixes: A list of frame prefixes to visualize.
+    """
+    # Initialize the index for subplot axes.
+    i = 1
+
+    for frame_prefix in frame_prefixes:
+        # Check if the target contains the target information for the current frame prefix.
+        if f'{frame_prefix}_target' not in target:
+            continue
+
+        frame_target = target[f'{frame_prefix}_target']
+        num_track_ids = len(frame_target['track_ids'])
+
+        # Function to generate a colormap for a given index.
+        def get_cmap(index):
+            return plt.cm.hsv(index / num_track_ids)
+
+        vis_previous_frames(axarr[i], frame_target, get_cmap)
+        i += 1
+
+
 def vis_results(visualizer, img, result, target, tracking):
+    frame_prefixes=['prev', 'prev_prev']
+    
     inv_normalize = T.Normalize(
         mean=[-0.485 / 0.229, -0.456 / 0.224, -0.406 / 0.255],
         std=[1 / 0.229, 1 / 0.224, 1 / 0.255]
@@ -106,7 +185,7 @@ def vis_results(visualizer, img, result, target, tracking):
 
     imgs = [inv_normalize(img).cpu()]
     img_ids = [target['image_id'].item()]
-    for key in ['prev', 'prev_prev']:
+    for key in frame_prefixes:
         if f'{key}_image' in target:
             imgs.append(inv_normalize(target[f'{key}_image']).cpu())
             img_ids.append(target[f'{key}_target'][f'image_id'].item())
@@ -214,31 +293,7 @@ def vis_results(visualizer, img, result, target, tracking):
 
     axarr[0].legend(handles=legend_handles)
 
-    i = 1
-    for frame_prefix in ['prev', 'prev_prev']:
-        # if f'{frame_prefix}_image_id' not in target or f'{frame_prefix}_boxes' not in target:
-        if f'{frame_prefix}_target' not in target:
-            continue
-
-        frame_target = target[f'{frame_prefix}_target']
-        cmap = plt.cm.get_cmap('hsv', len(frame_target['track_ids']))
-
-        for j, track_id in enumerate(frame_target['track_ids']):
-            x1, y1, x2, y2 = frame_target['boxes'][j]
-            axarr[i].text(
-                x1, y1, f"track_id={track_id}",
-                fontsize=10, bbox=dict(facecolor='white', alpha=0.5))
-            axarr[i].add_patch(plt.Rectangle(
-                (x1, y1), x2 - x1, y2 - y1,
-                fill=False, color='green', linewidth=2))
-
-            if 'masks' in frame_target:
-                mask = frame_target['masks'][j].cpu().numpy()
-                mask = np.ma.masked_where(mask == 0.0, mask)
-
-                axarr[i].imshow(
-                    mask, alpha=0.5, cmap=colors.ListedColormap([cmap(j)]))
-        i += 1
+    visualize_frame_targets(axarr, target, frame_prefixes=frame_prefixes)
 
     plt.subplots_adjust(wspace=0.01, hspace=0.01)
     plt.axis('off')
