@@ -114,10 +114,11 @@ def draw_rectangle(ax, x1, y1, x2, y2, fill=False, color='green', linewidth=2):
         linewidth=linewidth
     ))
 
+
 def draw_mask(ax, mask, cmap, alpha=0.5):
     """
     Displays the mask on the graphic.
-    
+
     Parameters:
     - ax: The matplotlib axes to draw on.
     - mask: The mask data to visualize.
@@ -133,7 +134,7 @@ def draw_mask(ax, mask, cmap, alpha=0.5):
 def vis_previous_frames(ax, frame_target, get_cmap):
     """
     Visualizes previous frames with tracking IDs, bounding boxes, and masks.
-    
+
     Parameters:
     - ax: The matplotlib axes to draw on.
     - frame_target: A dictionary containing 'track_ids', 'boxes', and optionally 'masks'.
@@ -146,8 +147,117 @@ def vis_previous_frames(ax, frame_target, get_cmap):
 
         if 'masks' in frame_target:
             mask = frame_target['masks'][j].cpu().numpy()
-            cmap = get_cmap(j)  # Assuming get_cmap returns a colormap for the current index.
+            # Assuming get_cmap returns a colormap for the current index.
+            cmap = get_cmap(j)
             draw_mask(ax, mask, cmap)
+
+
+def append_legend_handles_for_unmatched_track_queries(
+        track_queries_fal_pos_mask,
+        num_track_queries,
+        num_track_queries_with_id,
+        keep,
+        legend_handles):
+    """
+    Appends legend handles for track queries without matching IDs to the legend.
+    This function targets cases where the number of track queries with IDs does not match
+    the total number of track queries, indicating the presence of false or unmatched track queries.
+
+    Parameters:
+    - legend_handles: List of existing legend handles to append to.
+    - keep: Boolean mask for detections considered for visualization.
+    - track_queries_fal_pos_mask: Mask indicating false positive track queries.
+    - num_track_queries: Total number of track queries.
+    - num_track_queries_with_id: Number of track queries with an associated ID.
+    """
+    if num_track_queries_with_id == num_track_queries:
+        return
+
+    fal_pos_track_queries_count = keep[track_queries_fal_pos_mask].sum()
+    fal_pos_label = f"Unmatched track queries ({fal_pos_track_queries_count}/{num_track_queries - num_track_queries_with_id})"
+    legend_handles.append(mpatches.Patch(color='red', label=fal_pos_label))
+
+
+def append_track_queries_legend_if_exists(
+        num_track_queries: int,
+        num_track_queries_with_id: int,
+        track_queries_mask,
+        track_queries_fal_pos_mask,
+        keep: torch.Tensor,
+        legend_handles: list):
+    """
+    Appends a legend for track queries if they exist.
+
+    Args:
+        num_track_queries (int): The number of track queries.
+        num_track_queries_with_id (int): The number of track queries with an ID.
+        target (dict): The target object containing tracking information.
+        keep (torch.Tensor): A tensor indicating which detections to keep based on score comparison.
+        legend_handles (list): The list of legend handles to append new legend entries.
+
+    Returns:
+        None: Modifies legend_handles in-place by appending new legend entry if track queries exist.
+    """
+    if not num_track_queries:
+        return
+
+    # Compute the number of track queries that are not false positives and format the label.
+    track_queries_label = (
+        f"Track queries ({keep[track_queries_mask].sum() - keep[track_queries_fal_pos_mask].sum()}"
+        f"/{num_track_queries_with_id})\n- Track ID\n- Classification score\n- IoU")
+
+    # Append the formatted label as a new legend entry.
+    legend_handles.append(mpatches.Patch(
+        color='blue',
+        label=track_queries_label))
+
+
+def create_legend_handles(target: dict, keep: torch.Tensor, num_track_queries: int, num_track_queries_with_id: int) -> list:
+    """
+    Creates legend handles based on the detection results and tracking information.
+
+    Args:
+        target (dict): The target object containing tracking information.
+        keep (torch.Tensor): A tensor indicating which detections to keep based on score comparison.
+        num_track_queries (int): The number of track queries.
+        num_track_queries_with_id (int): The number of track queries with an ID.
+
+    Returns:
+        list: A list of legend handles.
+    """
+    legend_handles = [
+        mpatches.Patch(
+            color='green',
+            label=f"Object queries ({keep.sum()}/{len(target['boxes']) - num_track_queries_with_id})\n- Classification score"
+        )
+    ]
+
+    # Convert masks to the appropriate device.
+    track_queries_mask = target['track_queries_mask'].to(keep.device)
+    track_queries_fal_pos_mask = target['track_queries_fal_pos_mask'].to(
+        keep.device)
+
+    # Append track queries related legend entries if they exist.
+    append_track_queries_legend_if_exists(
+        num_track_queries,
+        num_track_queries_with_id,
+        track_queries_mask,
+        track_queries_fal_pos_mask,
+        keep,
+        legend_handles
+    )
+
+    # Append legend entries for unmatched track queries if any.
+    append_legend_handles_for_unmatched_track_queries(
+        track_queries_fal_pos_mask,
+        num_track_queries,
+        num_track_queries_with_id,
+        keep,
+        legend_handles
+    )
+
+    return legend_handles
+
 
 def visualize_frame_targets(axarr, target, frame_prefixes=['prev', 'prev_prev']):
     """
@@ -176,8 +286,8 @@ def visualize_frame_targets(axarr, target, frame_prefixes=['prev', 'prev_prev'])
 
 
 def vis_results(visualizer, img, result, target, tracking):
-    frame_prefixes=['prev', 'prev_prev']
-    
+    frame_prefixes = ['prev', 'prev_prev']
+
     inv_normalize = T.Normalize(
         mean=[-0.485 / 0.229, -0.456 / 0.224, -0.406 / 0.255],
         std=[1 / 0.229, 1 / 0.224, 1 / 0.255]
@@ -265,32 +375,12 @@ def vis_results(visualizer, img, result, target, tracking):
         track_queries_mask = target['track_queries_mask'].to(keep.device)
         query_keep = keep[track_queries_mask == 0]
 
-    legend_handles = [mpatches.Patch(
-        color='green',
-        label=f"object queries ({query_keep.sum()}/{len(target['boxes']) - num_track_queries_with_id})\n- cls_score")]
-
-    if num_track_queries:
-        track_queries_mask = target['track_queries_mask'].to(keep.device)
-        track_queries_fal_pos_mask = target['track_queries_fal_pos_mask'].to(keep.device)
-
-        track_queries_label = (
-            f"track queries ({keep[track_queries_mask].sum() - keep[track_queries_fal_pos_mask].sum()}"
-            f"/{num_track_queries_with_id})\n- track_id\n- cls_score\n- iou")
-
-        legend_handles.append(mpatches.Patch(
-            color='blue',
-            label=track_queries_label))
-
-    if num_track_queries_with_id != num_track_queries:
-        track_queries_fal_pos_mask = target['track_queries_fal_pos_mask'].to(keep.device)
-        track_queries_fal_pos_label = (
-            f"false track queries ({keep[track_queries_fal_pos_mask].sum()}"
-            f"/{num_track_queries - num_track_queries_with_id})")
-
-        legend_handles.append(mpatches.Patch(
-            color='red',
-            label=track_queries_fal_pos_label))
-
+    legend_handles = create_legend_handles(
+        target,
+        query_keep,
+        num_track_queries,
+        num_track_queries_with_id
+    )
     axarr[0].legend(handles=legend_handles)
 
     visualize_frame_targets(axarr, target, frame_prefixes=frame_prefixes)
