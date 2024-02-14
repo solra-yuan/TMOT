@@ -124,7 +124,9 @@ def draw_mask(ax, mask, cmap, alpha=0.5):
     - cmap: The colormap instance or a color string to use for the mask.
     - alpha: The alpha blending value, between 0 (transparent) and 1 (opaque).
     """
-    masked_mask = np.ma.masked_where(mask == 0.0, mask)
+
+    mask_is_zero = np.isclose(mask, 0.0, atol=1e-8)
+    masked_mask = np.ma.masked_where(mask_is_zero, mask)
     ax.imshow(masked_mask, alpha=alpha, cmap=cmap)
 
 
@@ -167,9 +169,7 @@ def visualize_frame_targets(axarr, target, frame_prefixes=['prev', 'prev_prev'])
         frame_target = target[f'{frame_prefix}_target']
         num_track_ids = len(frame_target['track_ids'])
 
-        # Function to generate a colormap for a given index.
-        def get_cmap(index):
-            return plt.cm.hsv(index / num_track_ids)
+        get_cmap = plt.cm.get_cmap('hsv', num_track_ids)
 
         vis_previous_frames(axarr[i], frame_target, get_cmap)
         i += 1
