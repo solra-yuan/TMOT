@@ -65,14 +65,20 @@ class LineVis(BaseVis):
             Y = torch.Tensor(y_data).unsqueeze(dim=0)
             X = torch.Tensor([x_label])
 
-        win = self.viz.line(X=X, Y=Y, opts=self.viz_opts, win=self.win, update=update)
+        win = self.viz.line(
+            X=X,
+            Y=Y,
+            opts=self.viz_opts,
+            win=self.win,
+            update=update
+        )
 
         if self.win is None:
             self.win = win
         self.viz.save([self.viz.env])
 
     def reset(self):
-        #TODO: currently reset does not empty directly only on the next plot.
+        # TODO: currently reset does not empty directly only on the next plot.
         # update='remove' is not working as expected.
         if self.win is not None:
             # self.viz.line(X=None, Y=None, win=self.win, update='remove')
@@ -212,7 +218,13 @@ def append_track_queries_legend_if_exists(
         label=track_queries_label))
 
 
-def create_legend_handles(target: dict, keep: torch.Tensor, num_track_queries: int, num_track_queries_with_id: int) -> list:
+def create_legend_handles(
+        target: dict,
+        keep: torch.Tensor,
+        query_keep: torch.Tensor,
+        num_track_queries: int,
+        num_track_queries_with_id: int
+) -> list:
     """
     Creates legend handles based on the detection results and tracking information.
 
@@ -228,7 +240,7 @@ def create_legend_handles(target: dict, keep: torch.Tensor, num_track_queries: i
     legend_handles = [
         mpatches.Patch(
             color='green',
-            label=f"Object queries ({keep.sum()}/{len(target['boxes']) - num_track_queries_with_id})\n- Classification score"
+            label=f"Object queries ({query_keep.sum()}/{len(target['boxes']) - num_track_queries_with_id})\n- Classification score"
         )
     ]
 
@@ -355,9 +367,7 @@ def vis_results(visualizer, img, result, target, tracking):
         result_boxes = clip_boxes_to_image(result['boxes'], target['size'])
         x1, y1, x2, y2 = result_boxes[box_id]
 
-        axarr[0].add_patch(plt.Rectangle(
-            (x1, y1), x2 - x1, y2 - y1,
-            fill=False, color=rect_color, linewidth=2))
+        draw_rectangle(axarr[0], x1, y1, x2, y2, color=rect_color)
 
         axarr[0].text(
             x1, y1 + offset, text,
@@ -365,10 +375,11 @@ def vis_results(visualizer, img, result, target, tracking):
 
         if 'masks' in result:
             mask = result['masks'][box_id][0].numpy()
-            mask = np.ma.masked_where(mask == 0.0, mask)
-
-            axarr[0].imshow(
-                mask, alpha=0.5, cmap=colors.ListedColormap([cmap(box_id)]))
+            draw_mask(
+                axarr[0],
+                mask,
+                cmap=colors.ListedColormap([cmap(box_id)])
+            )
 
     query_keep = keep
     if tracking:
@@ -377,6 +388,7 @@ def vis_results(visualizer, img, result, target, tracking):
 
     legend_handles = create_legend_handles(
         target,
+        keep,
         query_keep,
         num_track_queries,
         num_track_queries_with_id
