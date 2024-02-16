@@ -118,6 +118,11 @@ def draw_label(ax, x, y, lable, fontsize=10, bbox=dict(facecolor='white', alpha=
     draw_text(ax, x, y+10,  f"lable={lable}", fontsize=fontsize, bbox=bbox)
 
 
+def draw_label(ax, x, y, lable, fontsize=10, bbox=dict(facecolor='white', alpha=0.5)):
+    """Displays the tracking ID on the graphic."""
+    ax.text(x, y + 10, f"lable={lable}", fontsize=fontsize, bbox=bbox)
+
+
 def draw_rectangle(ax, x1, y1, x2, y2, fill=False, color='green', linewidth=2):
     """Draws a rectangle on the graphic."""
     ax.add_patch(plt.Rectangle(
@@ -158,6 +163,7 @@ def vis_previous_frames(ax, frame_target, get_cmap):
     for j, track_id in enumerate(frame_target['track_ids']):
         x1, y1, x2, y2 = frame_target['boxes'][j]
         draw_track_id(ax, x1, y1, track_id)
+        draw_label(ax, x1, y1, frame_target['labels'][j])
         draw_rectangle(ax, x1, y1, x2, y2)
 
         if 'masks' in frame_target:
