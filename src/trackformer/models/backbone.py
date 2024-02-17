@@ -14,7 +14,7 @@ from torchvision.ops.feature_pyramid_network import (FeaturePyramidNetwork,
 
 from ..util.misc import NestedTensor, is_main_process
 from .position_encoding import build_position_encoding
-from .resnet_alter import resnet50_preprocessing_type_a
+from .resnet_alter import resnet50_4_channel
 
 
 class FrozenBatchNorm2d(torch.nn.Module):
@@ -101,8 +101,8 @@ class Backbone(BackboneBase):
                  return_interm_layers: bool,
                  dilation: bool):
         norm_layer = FrozenBatchNorm2d
-        if name == 'resnet50_preprocessing_type_a':
-            backbone = resnet50_preprocessing_type_a(
+        if name == 'resnet50_4_channel':
+            backbone = resnet50_4_channel(
                 replace_stride_with_dilation=[False, False, dilation],
                 pretrained=is_main_process(), norm_layer=norm_layer)
         else:
