@@ -157,8 +157,12 @@ def vis_previous_frames(ax, frame_target, get_cmap):
     """
     for j, track_id in enumerate(frame_target['track_ids']):
         x1, y1, x2, y2 = frame_target['boxes'][j]
-        draw_track_id(ax, x1, y1, track_id)
-        draw_label(ax, x1, y1, frame_target['labels'][j])
+        draw_text(
+            ax,
+            x1,
+            y1,
+            f"track_id: {track_id}\nlable: {frame_target['labels'][j]}"
+        )
         draw_rectangle(ax, x1, y1, x2, y2)
 
         if 'masks' in frame_target:
@@ -429,7 +433,9 @@ def process_and_visualize_box(
     rect_color = 'red' if tracking and target['track_queries_fal_pos_mask'][box_id] else 'green'
     offset = 50 if tracking and target['track_queries_mask'][box_id] else 0
     score_text = f"{result['scores'][box_id]:0.2f}"
-    text = f"{track_ids[box_id]}\n{score_text}" if tracking else score_text
+    class_id = result['labels'][box_id]
+    text = f"class: {class_id}({result['class_scores'][box_id][class_id]:0.2f})\n" + \
+        f"track: {track_ids[box_id]}({score_text})" if tracking else score_text
 
     result_boxes = clip_boxes_to_image(result['boxes'], target['size'])
     x1, y1, x2, y2 = result_boxes[box_id]
