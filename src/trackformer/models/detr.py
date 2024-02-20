@@ -17,8 +17,15 @@ from ..util.misc import (NestedTensor, accuracy, dice_loss, get_world_size,
 class DETR(nn.Module):
     """ This is the DETR module that performs object detection. """
 
-    def __init__(self, backbone, transformer, num_classes, num_queries,
-                 aux_loss=False, overflow_boxes=False):
+    def __init__(
+            self,
+            backbone,
+            transformer,
+            num_classes,
+            num_queries,
+            aux_loss=False,
+            overflow_boxes=False
+    ):
         """ Initializes the model.
         Parameters:
             backbone: torch module of the backbone to be used. See backbone.py
@@ -237,8 +244,11 @@ class SetCriterion(nn.Module):
                                     dtype=torch.int64, device=src_logits.device)
         target_classes[idx] = target_classes_o
 
-        target_classes_onehot = torch.zeros([src_logits.shape[0], src_logits.shape[1], src_logits.shape[2] + 1],
-                                            dtype=src_logits.dtype, layout=src_logits.layout, device=src_logits.device)
+        target_classes_onehot = torch.zeros([
+            src_logits.shape[0],
+            src_logits.shape[1],
+            src_logits.shape[2] + 1
+        ],  dtype=src_logits.dtype, layout=src_logits.layout, device=src_logits.device)
         target_classes_onehot.scatter_(2, target_classes.unsqueeze(-1), 1)
 
         target_classes_onehot = target_classes_onehot[:, :, :-1]
@@ -249,8 +259,12 @@ class SetCriterion(nn.Module):
         #     query_mask = query_mask.repeat(1, 1, self.num_classes)
 
         loss_ce = sigmoid_focal_loss(
-            src_logits, target_classes_onehot, num_boxes,
-            alpha=self.focal_alpha, gamma=self.focal_gamma)
+            src_logits,
+            target_classes_onehot,
+            num_boxes,
+            alpha=self.focal_alpha,
+            gamma=self.focal_gamma
+        )
         # , query_mask=query_mask)
 
         # if self.tracking:

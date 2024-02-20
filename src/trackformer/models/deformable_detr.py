@@ -266,9 +266,11 @@ class DeformableDETR(DETR):
         outputs_class = torch.stack(outputs_classes)
         outputs_coord = torch.stack(outputs_coords)
 
-        out = {'pred_logits': outputs_class[-1],
-               'pred_boxes': outputs_coord[-1],
-               'hs_embed': hs[-1]}
+        out = {
+            'pred_logits': outputs_class[-1],
+            'pred_boxes': outputs_coord[-1],
+            'hs_embed': hs[-1]
+        }
 
         if self.aux_loss:
             out['aux_outputs'] = self._set_aux_loss(
@@ -343,9 +345,13 @@ class DeformablePostProcess(PostProcess):
         scale_fct = torch.stack([img_w, img_h, img_w, img_h], dim=1)
         boxes = boxes * scale_fct[:, None, :]
 
-        results = [
-            {'scores': s, 'scores_no_object': 1 - s, 'labels': l, 'boxes': b}
-            for s, l, b in zip(scores, labels, boxes)]
+        class_scores = torch.nn.functional.softmax(out_logits)
+        results = [{
+            'scores': s,
+            'scores_no_object': 1 - s,
+            'labels': l,
+            'boxes': b
+        } for s, l, b in zip(scores, labels, boxes)]
 
         if results_mask is not None:
             for i, mask in enumerate(results_mask):
