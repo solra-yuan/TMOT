@@ -17,8 +17,15 @@ from ..util.misc import (NestedTensor, accuracy, dice_loss, get_world_size,
 class DETR(nn.Module):
     """ This is the DETR module that performs object detection. """
 
-    def __init__(self, backbone, transformer, num_classes, num_queries,
-                 aux_loss=False, overflow_boxes=False):
+    def __init__(
+            self,
+            backbone,
+            transformer,
+            num_classes,
+            num_queries,
+            aux_loss=False,
+            overflow_boxes=False
+    ):
         """ Initializes the model.
         Parameters:
             backbone: torch module of the backbone to be used. See backbone.py
@@ -39,7 +46,11 @@ class DETR(nn.Module):
         self.query_embed = nn.Embedding(num_queries, self.hidden_dim)
 
         # match interface with deformable DETR
-        self.input_proj = nn.Conv2d(backbone.num_channels[-1], self.hidden_dim, kernel_size=1)
+        self.input_proj = nn.Conv2d(
+            backbone.num_channels[-1],
+            self.hidden_dim,
+            kernel_size=1
+        )
         # self.input_proj = nn.ModuleList([
         #     nn.Sequential(
         #         nn.Conv2d(backbone.num_channels[-1], self.hidden_dim, kernel_size=1)
@@ -93,7 +104,8 @@ class DETR(nn.Module):
         tgt = None
         if targets is not None and 'track_query_hs_embeds' in targets[0]:
             # [BATCH_SIZE, NUM_PROBS, 4]
-            track_query_hs_embeds = torch.stack([t['track_query_hs_embeds'] for t in targets])
+            track_query_hs_embeds = torch.stack(
+                [t['track_query_hs_embeds'] for t in targets])
 
             num_track_queries = track_query_hs_embeds.shape[1]
 
@@ -117,9 +129,11 @@ class DETR(nn.Module):
 
         outputs_class = self.class_embed(hs)
         outputs_coord = self.bbox_embed(hs).sigmoid()
-        out = {'pred_logits': outputs_class[-1],
-               'pred_boxes': outputs_coord[-1],
-               'hs_embed': hs_without_norm[-1]}
+        out = {
+            'pred_logits': outputs_class[-1],
+            'pred_boxes': outputs_coord[-1],
+            'hs_embed': hs_without_norm[-1]
+        }
 
         if self.aux_loss:
             out['aux_outputs'] = self._set_aux_loss(
@@ -142,6 +156,7 @@ class SetCriterion(nn.Module):
         1) we compute hungarian assignment between ground truth boxes and the outputs of the model
         2) we supervise each pair of matched ground-truth / prediction (supervise class and box)
     """
+
     def __init__(self, num_classes, matcher, weight_dict, eos_coef, losses,
                  focal_loss, focal_alpha, focal_gamma, tracking, track_query_false_positive_eos_weight):
         """ Create the criterion.
@@ -177,7 +192,9 @@ class SetCriterion(nn.Module):
         src_logits = outputs['pred_logits']
 
         idx = self._get_src_permutation_idx(indices)
-        target_classes_o = torch.cat([t["labels"][J] for t, (_, J) in zip(targets, indices)])
+        target_classes_o = torch.cat([
+            t["labels"][J] for t, (_, J) in zip(targets, indices)]
+        )
         target_classes = torch.full(src_logits.shape[:2], self.num_classes,
                                     dtype=torch.int64, device=src_logits.device)
         target_classes[idx] = target_classes_o
@@ -191,7 +208,8 @@ class SetCriterion(nn.Module):
             for i, target in enumerate(targets):
                 if 'track_query_boxes' in target:
                     # remove no-object weighting for false track_queries
-                    loss_ce[i, target['track_queries_fal_pos_mask']] *= 1 / self.eos_coef
+                    loss_ce[i, target['track_queries_fal_pos_mask']
+                            ] *= 1 / self.eos_coef
                     # assign false track_queries to some object class for the final weighting
                     target_classes = target_classes.clone()
                     target_classes[i, target['track_queries_fal_pos_mask']] = 0
@@ -207,7 +225,8 @@ class SetCriterion(nn.Module):
 
         if log:
             # TODO this should probably be a separate loss, not hacked in this one here
-            losses['class_error'] = 100 - accuracy(src_logits[idx], target_classes_o)[0]
+            losses['class_error'] = 100 - \
+                accuracy(src_logits[idx], target_classes_o)[0]
         return losses
 
     def loss_labels_focal(self, outputs, targets, indices, num_boxes, log=True):
@@ -218,16 +237,21 @@ class SetCriterion(nn.Module):
         src_logits = outputs['pred_logits']
 
         idx = self._get_src_permutation_idx(indices)
-        target_classes_o = torch.cat([t["labels"][J] for t, (_, J) in zip(targets, indices)])
+        target_classes_o = torch.cat([
+            t["labels"][J] for t, (_, J) in zip(targets, indices)]
+        )
         target_classes = torch.full(src_logits.shape[:2], self.num_classes,
                                     dtype=torch.int64, device=src_logits.device)
         target_classes[idx] = target_classes_o
 
-        target_classes_onehot = torch.zeros([src_logits.shape[0], src_logits.shape[1], src_logits.shape[2] + 1],
-                                            dtype=src_logits.dtype, layout=src_logits.layout, device=src_logits.device)
+        target_classes_onehot = torch.zeros([
+            src_logits.shape[0],
+            src_logits.shape[1],
+            src_logits.shape[2] + 1
+        ],  dtype=src_logits.dtype, layout=src_logits.layout, device=src_logits.device)
         target_classes_onehot.scatter_(2, target_classes.unsqueeze(-1), 1)
 
-        target_classes_onehot = target_classes_onehot[:,:,:-1]
+        target_classes_onehot = target_classes_onehot[:, :, :-1]
 
         # query_mask = None
         # if self.tracking:
@@ -235,9 +259,13 @@ class SetCriterion(nn.Module):
         #     query_mask = query_mask.repeat(1, 1, self.num_classes)
 
         loss_ce = sigmoid_focal_loss(
-            src_logits, target_classes_onehot, num_boxes,
-            alpha=self.focal_alpha, gamma=self.focal_gamma)
-            # , query_mask=query_mask)
+            src_logits,
+            target_classes_onehot,
+            num_boxes,
+            alpha=self.focal_alpha,
+            gamma=self.focal_gamma
+        )
+        # , query_mask=query_mask)
 
         # if self.tracking:
         #     mean_num_queries = torch.tensor([len(m.nonzero()) for m in query_mask]).float().mean()
@@ -249,7 +277,8 @@ class SetCriterion(nn.Module):
 
         if log:
             # TODO this should probably be a separate loss, not hacked in this one here
-            losses['class_error'] = 100 - accuracy(src_logits[idx], target_classes_o)[0]
+            losses['class_error'] = 100 - \
+                accuracy(src_logits[idx], target_classes_o)[0]
 
         # compute seperate track and object query losses
         # loss_ce = sigmoid_focal_loss(
@@ -280,9 +309,14 @@ class SetCriterion(nn.Module):
         """
         pred_logits = outputs['pred_logits']
         device = pred_logits.device
-        tgt_lengths = torch.as_tensor([len(v["labels"]) for v in targets], device=device)
+        tgt_lengths = torch.as_tensor(
+            [len(v["labels"]) for v in targets],
+            device=device
+        )
         # Count the number of predictions that are NOT "no-object" (which is the last class)
-        card_pred = (pred_logits.argmax(-1) != pred_logits.shape[-1] - 1).sum(1)
+        card_pred = (
+            pred_logits.argmax(-1) != pred_logits.shape[-1] - 1
+        ).sum(1)
         card_err = F.l1_loss(card_pred.float(), tgt_lengths.float())
         losses = {'cardinality_error': card_err}
         return losses
@@ -296,7 +330,10 @@ class SetCriterion(nn.Module):
         assert 'pred_boxes' in outputs
         idx = self._get_src_permutation_idx(indices)
         src_boxes = outputs['pred_boxes'][idx]
-        target_boxes = torch.cat([t['boxes'][i] for t, (_, i) in zip(targets, indices)], dim=0)
+        target_boxes = torch.cat([
+            t['boxes'][i] for t, (_, i) in zip(targets, indices)],
+            dim=0
+        )
 
         loss_bbox = F.l1_loss(src_boxes, target_boxes, reduction='none')
 
@@ -340,7 +377,9 @@ class SetCriterion(nn.Module):
         src_masks = outputs["pred_masks"]
 
         # TODO use valid to mask invalid areas due to padding in loss
-        target_masks, _ = nested_tensor_from_tensor_list([t["masks"] for t in targets]).decompose()
+        target_masks, _ = nested_tensor_from_tensor_list(
+            [t["masks"] for t in targets]
+        ).decompose()
         target_masks = target_masks.to(src_masks)
 
         src_masks = src_masks[src_idx]
@@ -359,13 +398,17 @@ class SetCriterion(nn.Module):
 
     def _get_src_permutation_idx(self, indices):
         # permute predictions following indices
-        batch_idx = torch.cat([torch.full_like(src, i) for i, (src, _) in enumerate(indices)])
+        batch_idx = torch.cat([
+            torch.full_like(src, i) for i, (src, _) in enumerate(indices)
+        ])
         src_idx = torch.cat([src for (src, _) in indices])
         return batch_idx, src_idx
 
     def _get_tgt_permutation_idx(self, indices):
         # permute targets following indices
-        batch_idx = torch.cat([torch.full_like(tgt, i) for i, (_, tgt) in enumerate(indices)])
+        batch_idx = torch.cat([
+            torch.full_like(tgt, i) for i, (_, tgt) in enumerate(indices)
+        ])
         tgt_idx = torch.cat([tgt for (_, tgt) in indices])
         return batch_idx, tgt_idx
 
@@ -387,7 +430,9 @@ class SetCriterion(nn.Module):
                       The expected keys in each dict depends on the losses applied,
                       see each loss' doc
         """
-        outputs_without_aux = {k: v for k, v in outputs.items() if k != 'aux_outputs'}
+        outputs_without_aux = {
+            k: v for k, v in outputs.items() if k != 'aux_outputs'
+        }
 
         # Retrieve the matching between the outputs of the last layer and the targets
         indices = self.matcher(outputs_without_aux, targets)
@@ -403,7 +448,9 @@ class SetCriterion(nn.Module):
         # Compute all the requested losses
         losses = {}
         for loss in self.losses:
-            losses.update(self.get_loss(loss, outputs, targets, indices, num_boxes))  # refer to get_loss
+            losses.update(
+                self.get_loss(loss, outputs, targets, indices, num_boxes)
+            )  # refer to get_loss
 
         # In case of auxiliary losses, we repeat this process with the
         # output of each intermediate layer.
@@ -418,7 +465,14 @@ class SetCriterion(nn.Module):
                     if loss == 'labels':
                         # Logging is enabled only for the last layer
                         kwargs = {'log': False}
-                    l_dict = self.get_loss(loss, aux_outputs, targets, indices, num_boxes, **kwargs)
+                    l_dict = self.get_loss(
+                        loss,
+                        aux_outputs,
+                        targets,
+                        indices,
+                        num_boxes,
+                        **kwargs
+                    )
                     l_dict = {k + f'_{i}': v for k, v in l_dict.items()}
                     losses.update(l_dict)
 
@@ -436,7 +490,14 @@ class SetCriterion(nn.Module):
                 if loss == 'labels':
                     # Logging is enabled only for the last layer
                     kwargs['log'] = False
-                l_dict = self.get_loss(loss, enc_outputs, bin_targets, indices, num_boxes, **kwargs)
+                l_dict = self.get_loss(
+                    loss,
+                    enc_outputs,
+                    bin_targets,
+                    indices,
+                    num_boxes,
+                    **kwargs
+                )
                 l_dict = {k + f'_enc': v for k, v in l_dict.items()}
                 losses.update(l_dict)
 
@@ -476,7 +537,6 @@ class PostProcess(nn.Module):
         scores, labels = prob[..., :-1].max(-1)
 
         boxes = self.process_boxes(out_bbox, target_sizes)
-
 
         results = [
             {'scores': s, 'labels': l, 'boxes': b, 'scores_no_object': s_n_o}
