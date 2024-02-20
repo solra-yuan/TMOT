@@ -345,13 +345,15 @@ class DeformablePostProcess(PostProcess):
         scale_fct = torch.stack([img_w, img_h, img_w, img_h], dim=1)
         boxes = boxes * scale_fct[:, None, :]
 
-        class_scores = torch.nn.functional.softmax(out_logits)
+        class_scores = torch.nn.functional.softmax(out_logits, dim=2)
+
         results = [{
+            'class_scores': cs,
             'scores': s,
             'scores_no_object': 1 - s,
             'labels': l,
             'boxes': b
-        } for s, l, b in zip(scores, labels, boxes)]
+        } for cs, s, l, b in zip(class_scores, scores, labels, boxes)]
 
         if results_mask is not None:
             for i, mask in enumerate(results_mask):
