@@ -5,14 +5,42 @@ import matplotlib.patches as mpatches
 import numpy as np
 import torch
 import torchvision.transforms as T
+import matplotlib
 from matplotlib import colors
 from matplotlib import pyplot as plt
 from torchvision.ops.boxes import clip_boxes_to_image
 from visdom import Visdom
+from distutils.version import LooseVersion
 
 from .util.plot_utils import fig_to_numpy
 
 logging.getLogger('visdom').setLevel(logging.CRITICAL)
+
+
+def get_hsv_color_map(lutsize: int):
+    """
+    Retrieve an HSV colormap adjusted to the specified lutsize.
+
+    If the version of matplotlib is 3.8.0 or higher, it uses the new colormaps interface 
+    to resample the 'hsv' colormap according to lutsize. Otherwise, it resorts to 
+    plt.cm.get_cmap to obtain a colormap adjusted to the specified lutsize.
+
+    Parameters:
+    lutsize (int): The size to resample the colormap.
+
+    Returns:
+    Colormap: The resampled 'hsv' colormap.
+    """
+
+    # Check the version of matplotlib to use the appropriate method for fetching the colormap.
+    if LooseVersion(matplotlib.__version__) >= LooseVersion("3.8.0"):
+        # For matplotlib 3.8.0 or newer, use the colormaps interface.
+        hsv = matplotlib.colormaps['hsv'].resampled(lutsize)
+    else:
+        # Otherwise, use plt.cm.get_cmap.
+        hsv = plt.cm.get_cmap('hsv', lutsize)
+
+    return hsv
 
 
 class BaseVis(object):
@@ -91,16 +119,15 @@ class ImgVis(BaseVis):
     def plot(self, images):
         """Plot given images."""
 
-        # images = [img.data if isinstance(img, torch.autograd.Variable)
-        #           else img for img in images]
-        # images = [img.squeeze(dim=0) if len(img.size()) == 4
-        #           else img for img in images]
+        # images = [img.data if isinstance(img, torch.autograd.Variable) else img for img in images]
+        # images = [img.squeeze(dim=0) if len(img.size()) == 4 else img for img in images]
 
         self.win = self.viz.images(
             images,
             nrow=1,
             opts=self.viz_opts,
-            win=self.win, )
+            win=self.win,
+        )
         self.viz.save([self.viz.env])
 
 
@@ -307,7 +334,7 @@ def visualize_frame_targets(axarr, target, frame_prefixes=['prev', 'prev_prev'])
         frame_target = target[f'{frame_prefix}_target']
         num_track_ids = len(frame_target['track_ids'])
 
-        get_cmap = plt.cm.get_cmap('hsv', num_track_ids)
+        get_cmap = get_hsv_color_map(num_track_ids)
 
         vis_previous_frames(axarr[i], frame_target, get_cmap)
         i += 1
@@ -348,7 +375,15 @@ def display_images(axarr, imgs, img_ids):
         draw_text(ax, 0, 0, f'IMG_ID={img_id}')
 
 
-def process_detection_box(ax, box_id, result, target, tracking, track_ids, cmap):
+def process_detection_box(
+    ax,
+    box_id,
+    result,
+    target,
+    tracking,
+    track_ids,
+    cmap
+):
     rect_color = 'green'
     offset = 0
     scores_text = f"{result['scores'][box_id]:0.2f}"
@@ -387,7 +422,8 @@ def process_all_detection_boxes(
     track_ids,
     keep
 ):
-    cmap = plt.cm.get_cmap('hsv', len(keep))
+    cmap = get_hsv_color_map(len(keep))
+
     # np.where(keep) returns indices of True elements
     for box_id in np.where(keep)[0]:
         process_detection_box(
@@ -525,7 +561,7 @@ def vis_results(
 
     keep = result['scores'].cpu() > result['scores_no_object'].cpu()
 
-    cmap = plt.cm.get_cmap('hsv', len(keep))
+    cmap = get_hsv_color_map(len(keep))
 
     process_and_visualize_boxes(
         axarr[0],
