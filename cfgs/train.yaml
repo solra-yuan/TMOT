@@ -20,8 +20,8 @@ two_stage: false
 freeze_detr: false
 load_mask_head_from_model: null
 # Backbone
-# Name of the convolutional backbone to use. ('resnet50', 'resnet101')
-backbone: resnet50
+# Name of the convolutional backbone to use. ('resnet50', 'resnet101', 'resnet50_4_channel')
+backbone: resnet50_4_channel
 # If true, we replace stride with dilation in the last convolutional block (DC5)
 dilation: false
 # Type of positional embedding to use on top of the image features. ('sine', 'learned')

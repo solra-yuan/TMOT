@@ -291,11 +291,13 @@ class FLIR_ADAS_V2_concat(Dataset):
         concatenated_img = torch.cat([img1, img2[0:1,:,:]], dim=0)
         if target1.get('prev_image') is not None and target2.get('prev_image') is not None:
             concatenated_prev_img = torch.cat([target1['prev_image'], target2['prev_image'][0:1,:,:]], dim=0)
+        
         target = target1
+        
         target['prev_image'] = concatenated_prev_img
         # concatenated_target = torch.cat([target1, target2])
 
-        #return concatenated_img, target1, target2
+        # return concatenated_img, target1, target2
         return concatenated_img, target
 
 
