@@ -119,9 +119,6 @@ class ImgVis(BaseVis):
     def plot(self, images):
         """Plot given images."""
 
-        # images = [img.data if isinstance(img, torch.autograd.Variable) else img for img in images]
-        # images = [img.squeeze(dim=0) if len(img.size()) == 4 else img for img in images]
-
         self.win = self.viz.images(
             images,
             nrow=1,
@@ -424,8 +421,8 @@ def process_all_detection_boxes(
 ):
     cmap = get_hsv_color_map(len(keep))
 
-    # np.where(keep) returns indices of True elements
-    for box_id in np.where(keep)[0]:
+    # np.nonzero(keep) returns indices of True elements
+    for box_id in np.nonzero(keep)[0]:
         process_detection_box(
             axarr[0],
             box_id,
