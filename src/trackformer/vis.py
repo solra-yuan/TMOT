@@ -10,7 +10,7 @@ from matplotlib import colors
 from matplotlib import pyplot as plt
 from torchvision.ops.boxes import clip_boxes_to_image
 from visdom import Visdom
-from distutils.version import LooseVersion
+from packaging.version import Version
 
 from .util.plot_utils import fig_to_numpy
 
@@ -33,7 +33,7 @@ def get_hsv_color_map(lutsize: int):
     """
 
     # Check the version of matplotlib to use the appropriate method for fetching the colormap.
-    if LooseVersion(matplotlib.__version__) >= LooseVersion("3.8.0"):
+    if Version(matplotlib.__version__) >= Version("3.8.0"):
         # For matplotlib 3.8.0 or newer, use the colormaps interface.
         hsv = matplotlib.colormaps['hsv'].resampled(lutsize)
     else:
