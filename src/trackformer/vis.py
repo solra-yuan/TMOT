@@ -5,14 +5,42 @@ import matplotlib.patches as mpatches
 import numpy as np
 import torch
 import torchvision.transforms as T
+import matplotlib
 from matplotlib import colors
 from matplotlib import pyplot as plt
 from torchvision.ops.boxes import clip_boxes_to_image
 from visdom import Visdom
+from packaging.version import Version
 
 from .util.plot_utils import fig_to_numpy
 
 logging.getLogger('visdom').setLevel(logging.CRITICAL)
+
+
+def get_hsv_color_map(lutsize: int):
+    """
+    Retrieve an HSV colormap adjusted to the specified lutsize.
+
+    If the version of matplotlib is 3.8.0 or higher, it uses the new colormaps interface 
+    to resample the 'hsv' colormap according to lutsize. Otherwise, it resorts to 
+    plt.cm.get_cmap to obtain a colormap adjusted to the specified lutsize.
+
+    Parameters:
+    lutsize (int): The size to resample the colormap.
+
+    Returns:
+    Colormap: The resampled 'hsv' colormap.
+    """
+
+    # Check the version of matplotlib to use the appropriate method for fetching the colormap.
+    if Version(matplotlib.__version__) >= Version("3.8.0"):
+        # For matplotlib 3.8.0 or newer, use the colormaps interface.
+        hsv = matplotlib.colormaps['hsv'].resampled(lutsize)
+    else:
+        # Otherwise, use plt.cm.get_cmap.
+        hsv = plt.cm.get_cmap('hsv', lutsize)
+
+    return hsv
 
 
 class BaseVis(object):
@@ -65,14 +93,20 @@ class LineVis(BaseVis):
             Y = torch.Tensor(y_data).unsqueeze(dim=0)
             X = torch.Tensor([x_label])
 
-        win = self.viz.line(X=X, Y=Y, opts=self.viz_opts, win=self.win, update=update)
+        win = self.viz.line(
+            X=X,
+            Y=Y,
+            opts=self.viz_opts,
+            win=self.win,
+            update=update
+        )
 
         if self.win is None:
             self.win = win
         self.viz.save([self.viz.env])
 
     def reset(self):
-        #TODO: currently reset does not empty directly only on the next plot.
+        # TODO: currently reset does not empty directly only on the next plot.
         # update='remove' is not working as expected.
         if self.win is not None:
             # self.viz.line(X=None, Y=None, win=self.win, update='remove')
@@ -85,51 +119,436 @@ class ImgVis(BaseVis):
     def plot(self, images):
         """Plot given images."""
 
-        # images = [img.data if isinstance(img, torch.autograd.Variable)
-        #           else img for img in images]
-        # images = [img.squeeze(dim=0) if len(img.size()) == 4
-        #           else img for img in images]
-
         self.win = self.viz.images(
             images,
             nrow=1,
             opts=self.viz_opts,
-            win=self.win, )
+            win=self.win,
+        )
         self.viz.save([self.viz.env])
 
 
-def vis_results(visualizer, img, result, target, tracking):
-    inv_normalize = T.Normalize(
-        mean=[-0.485 / 0.229, -0.456 / 0.224, -0.406 / 0.255],
-        std=[1 / 0.229, 1 / 0.224, 1 / 0.255]
+def draw_text(ax, x, y, text, fontsize=10, bbox=dict(facecolor='white', alpha=0.5)):
+    ax.text(x, y, text, fontsize=fontsize, bbox=bbox)
+
+
+def draw_track_id(ax, x, y, track_id, fontsize=10, bbox=dict(facecolor='white', alpha=0.5)):
+    """Displays the tracking ID on the graphic."""
+    draw_text(ax, x, y, f"track_id={track_id}", fontsize=fontsize,  bbox=bbox)
+
+
+def draw_label(ax, x, y, lable, fontsize=10, bbox=dict(facecolor='white', alpha=0.5)):
+    """Displays the tracking ID on the graphic."""
+    draw_text(ax, x, y+10,  f"lable={lable}", fontsize=fontsize, bbox=bbox)
+
+
+def draw_rectangle(ax, x1, y1, x2, y2, fill=False, color='green', linewidth=2):
+    """Draws a rectangle on the graphic."""
+    ax.add_patch(plt.Rectangle(
+        (x1, y1),
+        x2 - x1,
+        y2 - y1,
+        fill=fill,
+        color=color,
+        linewidth=linewidth
+    ))
+
+
+def draw_mask(ax, mask, cmap, alpha=0.5):
+    """
+    Displays the mask on the graphic.
+
+    Parameters:
+    - ax: The matplotlib axes to draw on.
+    - mask: The mask data to visualize.
+    - cmap: The colormap instance or a color string to use for the mask.
+    - alpha: The alpha blending value, between 0 (transparent) and 1 (opaque).
+    """
+
+    mask_is_zero = np.isclose(mask, 0.0, atol=1e-8)
+    masked_mask = np.ma.masked_where(mask_is_zero, mask)
+    ax.imshow(masked_mask, alpha=alpha, cmap=cmap)
+
+
+def vis_previous_frames(ax, frame_target, get_cmap):
+    """
+    Visualizes previous frames with tracking IDs, bounding boxes, and masks.
+
+    Parameters:
+    - ax: The matplotlib axes to draw on.
+    - frame_target: A dictionary containing 'track_ids', 'boxes', and optionally 'masks'.
+    - get_cmap: A function that takes an index and returns a colormap.
+    """
+    for j, track_id in enumerate(frame_target['track_ids']):
+        x1, y1, x2, y2 = frame_target['boxes'][j]
+        draw_text(
+            ax,
+            x1,
+            y1,
+            f"track_id: {track_id}\nlable: {frame_target['labels'][j]}"
+        )
+        draw_rectangle(ax, x1, y1, x2, y2)
+
+        if 'masks' in frame_target:
+            mask = frame_target['masks'][j].cpu().numpy()
+            # Assuming get_cmap returns a colormap for the current index.
+            cmap = get_cmap(j)
+            draw_mask(ax, mask, cmap)
+
+
+def append_legend_handles_for_unmatched_track_queries(
+    track_queries_fal_pos_mask,
+    num_track_queries,
+    num_track_queries_with_id,
+    keep,
+    legend_handles
+):
+    """
+    Appends legend handles for track queries without matching IDs to the legend.
+    This function targets cases where the number of track queries with IDs does not match
+    the total number of track queries, indicating the presence of false or unmatched track queries.
+
+    Parameters:
+    - legend_handles: List of existing legend handles to append to.
+    - keep: Boolean mask for detections considered for visualization.
+    - track_queries_fal_pos_mask: Mask indicating false positive track queries.
+    - num_track_queries: Total number of track queries.
+    - num_track_queries_with_id: Number of track queries with an associated ID.
+    """
+    if num_track_queries_with_id == num_track_queries:
+        return
+
+    fal_pos_track_queries_count = keep[track_queries_fal_pos_mask].sum()
+    fal_pos_label = f"Unmatched track queries ({fal_pos_track_queries_count}/{num_track_queries - num_track_queries_with_id})"
+    legend_handles.append(mpatches.Patch(color='red', label=fal_pos_label))
+
+
+def append_track_queries_legend_if_exists(
+    num_track_queries: int,
+    num_track_queries_with_id: int,
+    track_queries_mask,
+    track_queries_fal_pos_mask,
+    keep: torch.Tensor,
+    legend_handles: list
+):
+    """
+    Appends a legend for track queries if they exist.
+
+    Args:
+        num_track_queries (int): The number of track queries.
+        num_track_queries_with_id (int): The number of track queries with an ID.
+        target (dict): The target object containing tracking information.
+        keep (torch.Tensor): A tensor indicating which detections to keep based on score comparison.
+        legend_handles (list): The list of legend handles to append new legend entries.
+
+    Returns:
+        None: Modifies legend_handles in-place by appending new legend entry if track queries exist.
+    """
+    if not num_track_queries:
+        return
+
+    # Compute the number of track queries that are not false positives and format the label.
+    track_queries_label = (
+        f"Track queries ({keep[track_queries_mask].sum() - keep[track_queries_fal_pos_mask].sum()}"
+        f"/{num_track_queries_with_id})\n- Track ID\n- Classification score\n- IoU")
+
+    # Append the formatted label as a new legend entry.
+    legend_handles.append(mpatches.Patch(
+        color='blue',
+        label=track_queries_label))
+
+
+def create_legend_handles(
+        target: dict,
+        keep: torch.Tensor,
+        query_keep: torch.Tensor,
+        num_track_queries: int,
+        num_track_queries_with_id: int
+) -> list:
+    """
+    Creates legend handles based on the detection results and tracking information.
+
+    Args:
+        target (dict): The target object containing tracking information.
+        keep (torch.Tensor): A tensor indicating which detections to keep based on score comparison.
+        num_track_queries (int): The number of track queries.
+        num_track_queries_with_id (int): The number of track queries with an ID.
+
+    Returns:
+        list: A list of legend handles.
+    """
+    legend_handles = [
+        mpatches.Patch(
+            color='green',
+            label=f"Object queries ({query_keep.sum()}/{len(target['boxes']) - num_track_queries_with_id})\n- Classification score"
+        )
+    ]
+
+    # Convert masks to the appropriate device.
+    track_queries_mask = target['track_queries_mask'].to(keep.device)
+    track_queries_fal_pos_mask = target['track_queries_fal_pos_mask'].to(
+        keep.device)
+
+    # Append track queries related legend entries if they exist.
+    append_track_queries_legend_if_exists(
+        num_track_queries,
+        num_track_queries_with_id,
+        track_queries_mask,
+        track_queries_fal_pos_mask,
+        keep,
+        legend_handles
     )
 
+    # Append legend entries for unmatched track queries if any.
+    append_legend_handles_for_unmatched_track_queries(
+        track_queries_fal_pos_mask,
+        num_track_queries,
+        num_track_queries_with_id,
+        keep,
+        legend_handles
+    )
+
+    return legend_handles
+
+
+def visualize_frame_targets(axarr, target, frame_prefixes=['prev', 'prev_prev']):
+    """
+    Visualizes the tracking information for previous frames.
+
+    Parameters:
+    - axarr: The array of axes objects to draw the visualizations on.
+    - target: The target dictionary containing tracking information.
+    - frame_prefixes: A list of frame prefixes to visualize.
+    """
+    # Initialize the index for subplot axes.
+    i = 1
+
+    for frame_prefix in frame_prefixes:
+        # Check if the target contains the target information for the current frame prefix.
+        if f'{frame_prefix}_target' not in target:
+            continue
+
+        frame_target = target[f'{frame_prefix}_target']
+        num_track_ids = len(frame_target['track_ids'])
+
+        get_cmap = get_hsv_color_map(num_track_ids)
+
+        vis_previous_frames(axarr[i], frame_target, get_cmap)
+        i += 1
+
+
+def prepare_images_and_ids(target, img, frame_prefixes, inv_normalize):
     imgs = [inv_normalize(img).cpu()]
     img_ids = [target['image_id'].item()]
-    for key in ['prev', 'prev_prev']:
+
+    for key in frame_prefixes:
         if f'{key}_image' in target:
             imgs.append(inv_normalize(target[f'{key}_image']).cpu())
             img_ids.append(target[f'{key}_target'][f'image_id'].item())
 
-    # img.shape=[3, H, W]
-    dpi = 96
+    return imgs, img_ids
+
+
+def setup_figure(imgs, dpi=96):
     figure, axarr = plt.subplots(len(imgs))
     figure.tight_layout()
     figure.set_dpi(dpi)
     figure.set_size_inches(
         imgs[0].shape[2] / dpi,
-        imgs[0].shape[1] * len(imgs) / dpi)
+        imgs[0].shape[1] * len(imgs) / dpi
+    )
 
     if len(imgs) == 1:
         axarr = [axarr]
 
+    return figure, axarr
+
+
+def display_images(axarr, imgs, img_ids):
     for ax, img, img_id in zip(axarr, imgs, img_ids):
         ax.set_axis_off()
         ax.imshow(img.permute(1, 2, 0).clamp(0, 1))
 
-        ax.text(
-            0, 0, f'IMG_ID={img_id}',
-            fontsize=20, bbox=dict(facecolor='white', alpha=0.5))
+        draw_text(ax, 0, 0, f'IMG_ID={img_id}')
+
+
+def process_detection_box(
+    ax,
+    box_id,
+    result,
+    target,
+    tracking,
+    track_ids,
+    cmap
+):
+    rect_color = 'green'
+    offset = 0
+    scores_text = f"{result['scores'][box_id]:0.2f}"
+
+    if tracking:
+        if target['track_queries_fal_pos_mask'][box_id]:
+            rect_color = 'red'
+        elif target['track_queries_mask'][box_id]:
+            offset = 50
+            rect_color = 'blue'
+            scores_text = (
+                f"{track_ids[box_id]}\n"
+                f"{scores_text}\n"
+                f"{result['track_queries_with_id_iou'][box_id]:0.2f}"
+            )
+
+    result_boxes = clip_boxes_to_image(
+        result['boxes'],
+        target['size']
+    )
+    x1, y1, x2, y2 = result_boxes[box_id]
+
+    draw_rectangle(ax, x1, y1, x2, y2, color=rect_color)
+    draw_text(ax, x1, y1 + offset, scores_text)
+
+    if 'masks' in result:
+        mask = result['masks'][box_id][0].numpy()
+        draw_mask(ax, mask, cmap=colors.ListedColormap([cmap(box_id)]))
+
+
+def process_all_detection_boxes(
+    axarr,
+    result,
+    target,
+    tracking,
+    track_ids,
+    keep
+):
+    cmap = get_hsv_color_map(len(keep))
+
+    # np.nonzero(keep) returns indices of True elements
+    for box_id in np.nonzero(keep)[0]:
+        process_detection_box(
+            axarr[0],
+            box_id,
+            result,
+            target,
+            tracking,
+            track_ids,
+            cmap
+        )
+
+
+def process_and_visualize_box(
+    ax,
+    box_id,
+    keep,
+    result,
+    target,
+    tracking,
+    track_ids,
+    cmap
+):
+    """
+    Processes and visualizes a single bounding box based on tracking and keep conditions.
+
+    Args:
+        ax (matplotlib.axes.Axes): The Axes object to draw the visuals on.
+        box_id (int): The index of the current bounding box.
+        keep (numpy.ndarray): An array indicating which boxes to keep.
+        result (dict): The result dictionary containing 'scores', 'boxes', and optionally 'masks'.
+        target (dict): The target dictionary containing tracking information.
+        tracking (bool): Indicates whether tracking is enabled.
+        track_ids (list): List of track IDs corresponding to each box.
+        cmap (matplotlib.colors.ListedColormap): The colormap used for masks visualization.
+
+    Returns:
+        None
+    """
+    if not keep[box_id]:
+        return
+
+    rect_color = 'red' if tracking and target['track_queries_fal_pos_mask'][box_id] else 'green'
+    offset = 50 if tracking and target['track_queries_mask'][box_id] else 0
+    class_id = result['labels'][box_id]
+    text = f"class: {class_id}({result['class_scores'][box_id][class_id]:0.2f})\n" + \
+        f"track: {track_ids[box_id]}" if tracking else f"{result['scores'][box_id]:0.2f}"
+
+    result_boxes = clip_boxes_to_image(result['boxes'], target['size'])
+    x1, y1, x2, y2 = result_boxes[box_id]
+
+    draw_rectangle(ax, x1, y1, x2, y2, color=rect_color)
+    draw_text(ax, x1, y1 + offset, text)
+
+    if 'masks' in result:
+        mask = result['masks'][box_id][0].numpy()
+        draw_mask(ax, mask, cmap=colors.ListedColormap([cmap(box_id)]))
+
+
+def process_and_visualize_boxes(
+    ax,
+    keep,
+    result,
+    target,
+    tracking,
+    track_ids,
+    cmap
+):
+    """
+    Iterates over each box and visualizes it based on the keep condition and tracking information.
+
+    Args:
+        ax (matplotlib.axes.Axes): The Axes object to draw the visuals on.
+        keep (numpy.ndarray): An array indicating which boxes to keep.
+        result (dict): The result dictionary containing 'scores', 'boxes', and optionally 'masks'.
+        target (dict): The target dictionary containing tracking information.
+        tracking (bool): Indicates whether tracking is enabled.
+        track_ids (list): List of track IDs corresponding to each box.
+        cmap (matplotlib.colors.ListedColormap): The colormap used for masks visualization.
+
+    Returns:
+        None
+    """
+
+    # Counter for the property index, used when tracking is enabled
+    prop_i = 0
+
+    for box_id in range(len(keep)):
+        process_and_visualize_box(
+            ax,
+            prop_i,
+            keep,
+            result,
+            target,
+            tracking,
+            track_ids,
+            cmap
+        )
+
+        if tracking and target['track_queries_mask'][box_id]:
+            # Increment property index for tracked boxes
+            prop_i += 1
+
+
+def vis_results(
+    visualizer,
+    img,
+    result,
+    target,
+    tracking
+):
+    frame_prefixes = ['prev', 'prev_prev']
+
+    inv_normalize = T.Normalize(
+        mean=[-0.485 / 0.229, -0.456 / 0.224, -0.406 / 0.255],
+        std=[1 / 0.229, 1 / 0.224, 1 / 0.255]
+    )
+
+    imgs, img_ids = prepare_images_and_ids(
+        target,
+        img,
+        frame_prefixes,
+        inv_normalize
+    )
+
+    # img.shape=[3, H, W]
+    figure, axarr = setup_figure(imgs)
+    display_images(axarr, imgs, img_ids)
 
     num_track_queries = num_track_queries_with_id = 0
     if tracking:
@@ -139,101 +558,37 @@ def vis_results(visualizer, img, result, target, tracking):
 
     keep = result['scores'].cpu() > result['scores_no_object'].cpu()
 
-    cmap = plt.cm.get_cmap('hsv', len(keep))
+    cmap = get_hsv_color_map(len(keep))
 
-    prop_i = 0
-    for box_id in range(len(keep)):
-        rect_color = 'green'
-        offset = 0
-        text = f"{result['scores'][box_id]:0.2f}"
-
-        if tracking:
-            if target['track_queries_fal_pos_mask'][box_id]:
-                rect_color = 'red'
-            elif target['track_queries_mask'][box_id]:
-                offset = 50
-                rect_color = 'blue'
-                text = (
-                    f"{track_ids[prop_i]}\n"
-                    f"{text}\n"
-                    f"{result['track_queries_with_id_iou'][prop_i]:0.2f}")
-                prop_i += 1
-
-        if not keep[box_id]:
-            continue
-
-        # x1, y1, x2, y2 = result['boxes'][box_id]
-        result_boxes = clip_boxes_to_image(result['boxes'], target['size'])
-        x1, y1, x2, y2 = result_boxes[box_id]
-
-        axarr[0].add_patch(plt.Rectangle(
-            (x1, y1), x2 - x1, y2 - y1,
-            fill=False, color=rect_color, linewidth=2))
-
-        axarr[0].text(
-            x1, y1 + offset, text,
-            fontsize=10, bbox=dict(facecolor='white', alpha=0.5))
-
-        if 'masks' in result:
-            mask = result['masks'][box_id][0].numpy()
-            mask = np.ma.masked_where(mask == 0.0, mask)
-
-            axarr[0].imshow(
-                mask, alpha=0.5, cmap=colors.ListedColormap([cmap(box_id)]))
+    process_and_visualize_boxes(
+        axarr[0],
+        keep,
+        result,
+        target,
+        tracking,
+        track_ids,
+        cmap
+    )
 
     query_keep = keep
     if tracking:
-        query_keep = keep[target['track_queries_mask'] == 0]
+        track_queries_mask = target['track_queries_mask'].to(keep.device)
+        query_keep = keep[track_queries_mask == 0]
 
-    legend_handles = [mpatches.Patch(
-        color='green',
-        label=f"object queries ({query_keep.sum()}/{len(target['boxes']) - num_track_queries_with_id})\n- cls_score")]
-
-    if num_track_queries:
-        track_queries_label = (
-            f"track queries ({keep[target['track_queries_mask']].sum() - keep[target['track_queries_fal_pos_mask']].sum()}"
-            f"/{num_track_queries_with_id})\n- track_id\n- cls_score\n- iou")
-
-        legend_handles.append(mpatches.Patch(
-            color='blue',
-            label=track_queries_label))
-
-    if num_track_queries_with_id != num_track_queries:
-        track_queries_fal_pos_label = (
-            f"false track queries ({keep[target['track_queries_fal_pos_mask']].sum()}"
-            f"/{num_track_queries - num_track_queries_with_id})")
-
-        legend_handles.append(mpatches.Patch(
-            color='red',
-            label=track_queries_fal_pos_label))
-
+    legend_handles = create_legend_handles(
+        target,
+        keep,
+        query_keep,
+        num_track_queries,
+        num_track_queries_with_id
+    )
     axarr[0].legend(handles=legend_handles)
 
-    i = 1
-    for frame_prefix in ['prev', 'prev_prev']:
-        # if f'{frame_prefix}_image_id' not in target or f'{frame_prefix}_boxes' not in target:
-        if f'{frame_prefix}_target' not in target:
-            continue
-
-        frame_target = target[f'{frame_prefix}_target']
-        cmap = plt.cm.get_cmap('hsv', len(frame_target['track_ids']))
-
-        for j, track_id in enumerate(frame_target['track_ids']):
-            x1, y1, x2, y2 = frame_target['boxes'][j]
-            axarr[i].text(
-                x1, y1, f"track_id={track_id}",
-                fontsize=10, bbox=dict(facecolor='white', alpha=0.5))
-            axarr[i].add_patch(plt.Rectangle(
-                (x1, y1), x2 - x1, y2 - y1,
-                fill=False, color='green', linewidth=2))
-
-            if 'masks' in frame_target:
-                mask = frame_target['masks'][j].cpu().numpy()
-                mask = np.ma.masked_where(mask == 0.0, mask)
-
-                axarr[i].imshow(
-                    mask, alpha=0.5, cmap=colors.ListedColormap([cmap(j)]))
-        i += 1
+    visualize_frame_targets(
+        axarr,
+        target,
+        frame_prefixes=frame_prefixes
+    )
 
     plt.subplots_adjust(wspace=0.01, hspace=0.01)
     plt.axis('off')
@@ -244,7 +599,10 @@ def vis_results(visualizer, img, result, target, tracking):
     visualizer.plot(img)
 
 
-def build_visualizers(args: dict, train_loss_names: list):
+def build_visualizers(
+    args: dict,
+    train_loss_names: list
+):
     visualizers = {}
     visualizers['train'] = {}
     visualizers['val'] = {}
@@ -258,7 +616,8 @@ def build_visualizers(args: dict, train_loss_names: list):
         'env': env_name,
         'resume': args.resume and args.resume_vis,
         'port': args.vis_port,
-        'server': args.vis_server}
+        'server': args.vis_server
+    }
 
     #
     # METRICS
@@ -266,6 +625,7 @@ def build_visualizers(args: dict, train_loss_names: list):
 
     legend = ['loss']
     legend.extend(train_loss_names)
+
     # for i in range(len(train_loss_names)):
     #     legend.append(f"{train_loss_names[i]}_unscaled")
 
@@ -288,19 +648,14 @@ def build_visualizers(args: dict, train_loss_names: list):
         'iter_time'
     ])
 
-    # if not args.masks:
-    #     legend.remove('loss_mask')
-    #     legend.remove('loss_mask_unscaled')
-    #     legend.remove('loss_dice')
-    #     legend.remove('loss_dice_unscaled')
-
     opts = dict(
         title="TRAIN METRICS ITERS",
         xlabel='ITERS',
         ylabel='METRICS',
         width=1000,
         height=500,
-        legend=legend)
+        legend=legend
+    )
 
     # TRAIN
     visualizers['train']['iter_metrics'] = LineVis(opts, **vis_kwargs)
