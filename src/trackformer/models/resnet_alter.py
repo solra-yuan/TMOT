@@ -101,7 +101,13 @@ def resnet50_4_channel(pretrained: bool = False, progress: bool = True, **kwargs
         pretrained (bool): If True, returns a model pre-trained on ImageNet
         progress (bool): If True, displays a progress bar of the download to stderr
     """
-    pretrained_resnet = _resnet_4_channel('resnet50', Bottleneck, [3, 4, 6, 3], pretrained, progress,
-                                          **kwargs)
+    pretrained_resnet = _resnet_4_channel(
+        'resnet50',
+        Bottleneck,
+        [3, 4, 6, 3],
+        pretrained,
+        progress,
+        **kwargs
+    )
 
     return pretrained_resnet
