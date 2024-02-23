@@ -3,7 +3,8 @@ from torch import Tensor
 import torch.nn as nn
 from torch.hub import load_state_dict_from_url
 from typing import Type, Any, Callable, Union, List, Optional
-from torchvision.models.resnet import ResNet, BasicBlock, Bottleneck, conv1x1
+from torchvision.models.resnet import BasicBlock, Bottleneck, conv1x1
+from .CustomResNet import CustomResNet
 
 __all__ = ['ResNet', 'resnet18', 'resnet34', 'resnet50', 'resnet101',
            'resnet152', 'resnext50_32x4d', 'resnext101_32x8d',
@@ -23,7 +24,7 @@ model_urls = {
 }
 
 
-class ResNet4Channel(ResNet):
+class ResNet4Channel(CustomResNet):
     def __init__(
             self,
         block: Type[Union[BasicBlock, Bottleneck]],
@@ -46,23 +47,34 @@ class ResNet4Channel(ResNet):
             norm_layer
         )
 
+    def preprocessing_sequence(self):
         self.conv_rgbt_to_latent = nn.Conv2d(
-            4, self.inplanes, kernel_size=3, stride=1, padding=1, bias=False)
+            4,
+            self.inplanes,
+            kernel_size=3,
+            stride=1,
+            padding=1,
+            bias=False
+        )
         self.rgbt_bn = nn.BatchNorm2d(self.inplanes)
         self.rgbt_relu = nn.ReLU(inplace=True)
         self.rgbt_maxpool = nn.MaxPool2d(kernel_size=3, stride=2, padding=1)
+        
         rgbt_downsample = nn.Sequential(
             conv1x1(self.inplanes, 256, stride=1),
-            norm_layer(256)
+            self._norm_layer(256)
         )
         self.preprocess_latent_channel = nn.Sequential(
-            Bottleneck(self.inplanes, 64,
-                       stride=1,
-                       downsample=rgbt_downsample,
-                       groups=1,
-                       base_width=64,
-                       dilation=1)
+            Bottleneck(
+                self.inplanes, 64,
+                stride=1,
+                downsample=rgbt_downsample,
+                groups=1,
+                base_width=64,
+                dilation=1
+            )
         )
+
         self.conv_inplane_to_rgb = nn.Conv2d(
             self.inplanes*4, 3, kernel_size=3, stride=1, padding=1, bias=False)
 
@@ -93,7 +105,7 @@ def _resnet_4_channel(
     return model
 
 
-def resnet50_4_channel(pretrained: bool = False, progress: bool = True, **kwargs: Any) -> ResNet:
+def resnet50_4_channel(pretrained: bool = False, progress: bool = True, **kwargs: Any) -> ResNet4Channel:
     r"""ResNet-50 model from
     `"Deep Residual Learning for Image Recognition" <https://arxiv.org/pdf/1512.03385.pdf>`_.
 
