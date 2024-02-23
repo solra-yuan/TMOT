@@ -466,8 +466,13 @@ def process_and_visualize_box(
     rect_color = 'red' if tracking and target['track_queries_fal_pos_mask'][box_id] else 'green'
     offset = 50 if tracking and target['track_queries_mask'][box_id] else 0
     class_id = result['labels'][box_id]
-    text = f"class: {class_id}({result['class_scores'][box_id][class_id]:0.2f})\n" + \
-        f"track: {track_ids[box_id]}" if tracking else f"{result['scores'][box_id]:0.2f}"
+    try:
+        text = f"class: {class_id}({result['class_scores'][box_id][class_id]:0.2f})\n" + \
+            f"track: {track_ids[box_id]}" if tracking else f"{result['scores'][box_id]:0.2f}"
+    except IndexError as e:
+        text = str(e)
+        print(e)
+
 
     result_boxes = clip_boxes_to_image(result['boxes'], target['size'])
     x1, y1, x2, y2 = result_boxes[box_id]
@@ -488,7 +493,7 @@ def process_and_visualize_boxes(
     tracking,
     track_ids,
     cmap
-):
+):  
     """
     Iterates over each box and visualizes it based on the keep condition and tracking information.
 
