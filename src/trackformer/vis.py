@@ -338,12 +338,12 @@ def visualize_frame_targets(axarr, target, frame_prefixes=['prev', 'prev_prev'])
 
 
 def prepare_images_and_ids(target, img, frame_prefixes, inv_normalize):
-    imgs = [inv_normalize(img).cpu()]
+    imgs = [inv_normalize(img[:3]).cpu()]
     img_ids = [target['image_id'].item()]
 
     for key in frame_prefixes:
         if f'{key}_image' in target:
-            imgs.append(inv_normalize(target[f'{key}_image']).cpu())
+            imgs.append(inv_normalize(target[f'{key}_image'][:3]).cpu())
             img_ids.append(target[f'{key}_target'][f'image_id'].item())
 
     return imgs, img_ids
