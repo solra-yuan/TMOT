@@ -77,8 +77,8 @@ class AbstractCocoGenerator(ABC):
         frame_range: Dict[str, float],
         data_root: str,
         save_root: str,
-        dataset_base_path: Optional[str],
-        gt_file_name: str
+        gt_file_name: str,
+        dataset_base_path: Optional[str] = None,
     ):
         self.split_name = split_name
         self.seqs_names = seqs_names

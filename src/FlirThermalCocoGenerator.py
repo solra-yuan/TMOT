@@ -11,9 +11,9 @@ class FlirThermalCocoGenerator(AbstractCocoGenerator):
         frame_range: dict[str, float],
         data_root: str,
         save_root: str,
-        dataset_base_path: Optional[str],
         rgb_seq_to_thermal_seq: dict[str, str],
         gt_file_name: str = 'coco_gt_t/coco.json',
+        dataset_base_path: Optional[str] = None,
     ):
         super().__init__(
             split_name=split_name,
