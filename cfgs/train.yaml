@@ -139,3 +139,9 @@ no_vis: false
 
 flir_adas_v2_path_train: data/flir_adas_v2
 flir_adas_v2_path_val: data/flir_adas_v2
+
+flir_adas_v2_train_split: train_coco
+flir_adas_v2_val_split: val_coco
+
+flir_adas_v2_thermal_train_split: train_coco_t
+flir_adas_v2_thermal_val_split: val_coco_t

@@ -13,3 +13,4 @@ resume: models/r50_deformable_detr_plus_iterative_bbox_refinement-checkpoint_hid
 
 epochs: 50
 lr_drop: 10
+backbone: resnet50

@@ -7,3 +7,4 @@ masks: true
 lr: 0.0001
 lr_drop: 50
 epochs: 50
+backbone: resnet50

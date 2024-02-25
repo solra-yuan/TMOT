@@ -19,3 +19,4 @@ flir_adas_v2_val_split: val_coco
 
 flir_adas_v2_thermal_train_split: train_coco_t
 flir_adas_v2_thermal_val_split: val_coco_t
+backbone: resnet50_4_channel
