@@ -10,3 +10,4 @@ lr_backbone: 0.000001
 
 epochs: 40
 lr_drop: 40
+backbone: resnet50

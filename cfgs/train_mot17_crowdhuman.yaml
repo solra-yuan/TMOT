@@ -11,3 +11,4 @@ resume: models/crowdhuman_deformable_trackformer/checkpoint_epoch_80.pth
 
 epochs: 40
 lr_drop: 10
+backbone: resnet50
