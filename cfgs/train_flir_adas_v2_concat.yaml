@@ -1,4 +1,5 @@
 # copy of train_mot17
+dataset: flir_adas_v2_concat
 
 flir_adas_v2_thermal_train_split: train_coco_t
 flir_adas_v2_thermal_val_split: val_coco_t
