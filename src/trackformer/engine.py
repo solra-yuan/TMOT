@@ -19,6 +19,7 @@ from .util import misc as utils
 from .util.box_ops import box_iou
 from .util.track_utils import evaluate_mot_accums
 from .vis import vis_results
+from .datasets.flir_adas_v2 import FLIR_ADAS_V2_concat
 
 
 def make_results(outputs, targets, postprocessors, tracking, return_only_orig=True):
@@ -179,6 +180,18 @@ def train_one_epoch(model: torch.nn.Module, criterion: torch.nn.Module, postproc
 
     return {k: meter.global_avg for k, meter in metric_logger.meters.items()}
 
+def config_update(dataset_name, is_rgb_t, data_loader, obj_detector_model):
+    config_updates = {
+        'seed': None,
+        'dataset_name': dataset_name,
+        'frame_range': data_loader.dataset.frame_range,
+        'obj_detector_model': obj_detector_model}
+    if is_rgb_t:
+        thermal_dataset_name = [name + "_rgb_t" 
+                                for name in config_updates['dataset_name']]
+        config_updates['dataset_name'] = thermal_dataset_name
+    
+    return config_updates
 
 @torch.no_grad()
 def evaluate(model, criterion, postprocessors, data_loader, device,
@@ -322,11 +335,12 @@ def evaluate(model, criterion, postprocessors, data_loader, device,
             'post': postprocessors,
             'img_transform': args.img_transform}
 
-        config_updates = {
-            'seed': None,
-            'dataset_name': dataset_name,
-            'frame_range': data_loader.dataset.frame_range,
-            'obj_detector_model': obj_detector_model}
+        is_rgb_t = True if isinstance(data_loader.dataset, FLIR_ADAS_V2_concat) else False
+        config_updates = config_update(dataset_name, 
+                                       is_rgb_t, 
+                                       data_loader, 
+                                       obj_detector_model)
+
         run = ex.run(config_updates=config_updates)
 
         mot_accums = utils.all_gather(run.result)[:len(seqs)]

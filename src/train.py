@@ -151,7 +151,7 @@ def train(args: Namespace) -> None:
     if args.tracking:
         # assert args.batch_size == 1
         if args.dataset == 'flir_adas_v2' or args.dataset == 'flir_adas_v2_concat':
-            args.tracking_eval = False  # @TODO : tracking evaluation code- look into factory.py
+            args.tracking_eval = True  # @TODO : tracking evaluation code- look into factory.py
         elif args.tracking_eval:
             assert 'mot' in args.dataset
 

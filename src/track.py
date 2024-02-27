@@ -40,6 +40,9 @@ def main(seed, dataset_name, obj_detect_checkpoint_file, tracker_cfg,
     # training. in that case we omit verbose outputs.
     if obj_detector_model is None:
         sacred.commands.print_config(_run)
+    else:
+        sacred.commands.print_config(_run)
+        print(obj_detect_checkpoint_file)
 
     # set all seeds
     if seed is not None:

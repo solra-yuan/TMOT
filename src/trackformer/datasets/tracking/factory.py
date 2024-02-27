@@ -7,7 +7,7 @@ from typing import Union
 from torch.utils.data import ConcatDataset
 
 from .demo_sequence import DemoSequence
-from .mot_wrapper import MOT17Wrapper, MOT20Wrapper, MOTS20Wrapper, FLIR_ADAS_V2_Wrapper
+from .mot_wrapper import MOT17Wrapper, MOT20Wrapper, MOTS20Wrapper, FLIR_ADAS_V2_Wrapper, FLIR_ADAS_V2_CONCATWrapper
 
 DATASETS = {}
 
@@ -35,6 +35,19 @@ for split in ['TRAIN', 'TEST', 'flir_adas_v2',
     name = f"{split}"
     DATASETS[name] = (
         lambda kwargs, split=split: FLIR_ADAS_V2_Wrapper(split, dets=None, **kwargs))
+
+for split in ['FLIR_ADAS_V2_CONCAT_TRAIN', 'FLIR_ADAS_V2_CONCAT_TEST', 'FLIR_ADAS_V2_CONCAT_ALL',
+              'video-BzZspxAweF8AnKhWK_rgb_t', 
+              'video-FkqCGijjAKpABetZZ_rgb_t', 
+              'video-PGdt7pJChnKoJDt35_rgb_t', 
+              'video-RMxN6a4CcCeLGu4tA_rgb_t', 
+              'video-YnfPeH8i2uBWmsSd2_rgb_t', 
+              'video-dvZBYnphN2BwdMKBc_rgb_t', 
+              'video-hnbGXq3nNPjBbc7CL_rgb_t', 
+              'video-msNEBxJE5PPDqenBM_rgb_t']:
+    name = f"{split}"
+    DATASETS[name] = (
+        lambda kwargs, split=split: FLIR_ADAS_V2_CONCATWrapper(split, dets=None, **kwargs))
 
 for split in ['TRAIN', 'TEST', 'ALL', '01', '02', '03', '04', '05',
               '06', '07', '08']:

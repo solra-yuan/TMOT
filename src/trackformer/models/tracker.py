@@ -18,6 +18,7 @@ class Tracker:
 
     def __init__(self, obj_detector, obj_detector_post, tracker_cfg,
                  generate_attention_maps, logger=None, verbose=False):
+        # 사용할 멤버 변수 선언
         self.obj_detector = obj_detector
         self.obj_detector_post = obj_detector_post
         self.detection_obj_score_thresh = tracker_cfg['detection_obj_score_thresh']
