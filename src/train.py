@@ -148,13 +148,6 @@ def train(args: Namespace) -> None:
     if not args.deformable:
         assert args.num_feature_levels == 1
 
-    if args.tracking:
-        # assert args.batch_size == 1
-        if args.dataset == 'flir_adas_v2' or args.dataset == 'flir_adas_v2_concat':
-            args.tracking_eval = True  # @TODO : tracking evaluation code- look into factory.py
-        elif args.tracking_eval:
-            assert 'mot' in args.dataset
-
     output_dir = Path(args.output_dir)
     if args.output_dir:
         output_dir.mkdir(parents=True, exist_ok=True)
