@@ -519,13 +519,7 @@ def process_and_visualize_boxes(
     prop_i = 0
 
     for box_id in range(len(keep)):       
-        if tracking and target['track_queries_mask'][box_id]:
-            # Increment property index for tracked boxes
-            prop_i += 1
         
-        if not keep[box_id]:
-            continue
-
         process_and_visualize_box(
             ax,
             box_id,
@@ -537,12 +531,6 @@ def process_and_visualize_boxes(
             track_ids,
             cmap
         )
-
-<<<<<<< HEAD
-=======
-
-
->>>>>>> b477a9b (fix track_text and add track box_iou)
 
 def vis_results(
     visualizer,
