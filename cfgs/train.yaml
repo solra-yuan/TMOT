@@ -47,7 +47,7 @@ pre_norm: false
 dec_n_points: 4
 enc_n_points: 4
 # Tracking
-tracking: false
+tracking: true
 # In addition to detection also run tracking evaluation with default configuration from `cfgs/track.yaml`
 tracking_eval: true
 # Range of possible random previous frames

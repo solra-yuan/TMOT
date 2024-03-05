@@ -21,6 +21,20 @@ from .util.track_utils import evaluate_mot_accums
 from .vis import vis_results
 from .datasets.flir_adas_v2 import FLIR_ADAS_V2_concat
 
+def calculate_box_iou_for_track_queries(result, target):
+    track_query_match_ids = target['track_query_match_ids'].to(target['boxes'].device)
+
+    track_queries_iou, _ = box_iou(
+        target['boxes'][track_query_match_ids],
+        result['boxes'])
+
+    box_ids = [box_id
+        for box_id, (is_track_query, is_fals_pos_track_query)
+        in enumerate(zip(target['track_queries_mask'], target['track_queries_fal_pos_mask']))
+        if is_track_query and not is_fals_pos_track_query]
+
+    result['track_queries_with_id_iou'] = torch.diagonal(track_queries_iou[:, box_ids])
+    print()
 
 def make_results(outputs, targets, postprocessors, tracking, return_only_orig=True):
     target_sizes = torch.stack([t["size"] for t in targets], dim=0)
@@ -85,21 +99,7 @@ def make_results(outputs, targets, postprocessors, tracking, return_only_orig=Tr
                 target['prev_target']['size'].unsqueeze(dim=0))[0].cpu()
 
             if 'track_query_match_ids' in target and len(target['track_query_match_ids']):
-                print("target['boxes']", target['boxes'], "device", target['boxes'].device)
-                print("target['track_query_match_ids']", target['track_query_match_ids'], target['track_query_match_ids'].device)
-
-                track_query_match_ids = target['track_query_match_ids'].to(target['boxes'].device)
-
-                track_queries_iou, _ = box_iou(
-                    target['boxes'][track_query_match_ids],
-                    result['boxes'])
-
-                box_ids = [box_id
-                    for box_id, (is_track_query, is_fals_pos_track_query)
-                    in enumerate(zip(target['track_queries_mask'], target['track_queries_fal_pos_mask']))
-                    if is_track_query and not is_fals_pos_track_query]
-
-                result['track_queries_with_id_iou'] = torch.diagonal(track_queries_iou[:, box_ids])
+                calculate_box_iou_for_track_queries(result, target)
 
     return results_orig, results
 

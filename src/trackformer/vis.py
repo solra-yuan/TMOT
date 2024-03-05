@@ -437,6 +437,7 @@ def process_all_detection_boxes(
 def process_and_visualize_box(
     ax,
     box_id,
+    prop_i,
     keep,
     result,
     target,
@@ -450,6 +451,7 @@ def process_and_visualize_box(
     Args:
         ax (matplotlib.axes.Axes): The Axes object to draw the visuals on.
         box_id (int): The index of the current bounding box.
+        prop_i
         keep (numpy.ndarray): An array indicating which boxes to keep.
         result (dict): The result dictionary containing 'scores', 'boxes', and optionally 'masks'.
         target (dict): The target dictionary containing tracking information.
@@ -463,13 +465,19 @@ def process_and_visualize_box(
     rect_color = 'red' if tracking and target['track_queries_fal_pos_mask'][box_id] else 'green'
     offset = 50 if tracking and target['track_queries_mask'][box_id] else 0
     class_id = result['labels'][box_id]
-    try:
-        text = f"class: {class_id}({result['class_scores'][box_id][class_id]:0.2f})\n" + \
-            f"track: {track_ids[box_id]}" if tracking else f"{result['scores'][box_id]:0.2f}"
-    except IndexError as e:
-        text = str(e)
-        print(e)
+    text = f"class: {class_id}\n" + f"score(one class): {result['scores'][box_id]:0.2f}"
 
+    if tracking:
+        if target['track_queries_fal_pos_mask'][box_id]:
+            rect_color = 'red'
+        elif target['track_queries_mask'][box_id]:
+            rect_color = 'blue'
+            text = f"class: {class_id}({result['class_scores'][box_id][class_id]:0.2f})\n" + \
+                f"track: {track_ids[prop_i]}({result['track_queries_with_id_iou'][prop_i]:0.2f})"
+            prop_i += 1
+
+    if not keep[box_id]:
+        return
 
     result_boxes = clip_boxes_to_image(result['boxes'], target['size'])
     x1, y1, x2, y2 = result_boxes[box_id]
@@ -520,6 +528,7 @@ def process_and_visualize_boxes(
 
         process_and_visualize_box(
             ax,
+            box_id,
             prop_i,
             keep,
             result,
@@ -529,6 +538,11 @@ def process_and_visualize_boxes(
             cmap
         )
 
+<<<<<<< HEAD
+=======
+
+
+>>>>>>> b477a9b (fix track_text and add track box_iou)
 
 def vis_results(
     visualizer,
