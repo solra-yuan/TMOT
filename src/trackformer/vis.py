@@ -477,7 +477,7 @@ def process_and_visualize_box(
             prop_i += 1
 
     if not keep[box_id]:
-        return
+        return prop_i
 
     result_boxes = clip_boxes_to_image(result['boxes'], target['size'])
     x1, y1, x2, y2 = result_boxes[box_id]
@@ -488,6 +488,8 @@ def process_and_visualize_box(
     if 'masks' in result:
         mask = result['masks'][box_id][0].numpy()
         draw_mask(ax, mask, cmap=colors.ListedColormap([cmap(box_id)]))
+    
+    return prop_i
 
 
 def process_and_visualize_boxes(
@@ -519,14 +521,8 @@ def process_and_visualize_boxes(
     prop_i = 0
 
     for box_id in range(len(keep)):       
-        if tracking and target['track_queries_mask'][box_id]:
-            # Increment property index for tracked boxes
-            prop_i += 1
-        
-        if not keep[box_id]:
-            continue
 
-        process_and_visualize_box(
+        prop_i = process_and_visualize_box(
             ax,
             box_id,
             prop_i,
@@ -537,12 +533,6 @@ def process_and_visualize_boxes(
             track_ids,
             cmap
         )
-
-<<<<<<< HEAD
-=======
-
-
->>>>>>> b477a9b (fix track_text and add track box_iou)
 
 def vis_results(
     visualizer,
