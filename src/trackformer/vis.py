@@ -460,9 +460,6 @@ def process_and_visualize_box(
     Returns:
         None
     """
-    if not keep[box_id]:
-        return
-
     rect_color = 'red' if tracking and target['track_queries_fal_pos_mask'][box_id] else 'green'
     offset = 50 if tracking and target['track_queries_mask'][box_id] else 0
     class_id = result['labels'][box_id]
@@ -513,7 +510,14 @@ def process_and_visualize_boxes(
     # Counter for the property index, used when tracking is enabled
     prop_i = 0
 
-    for box_id in range(len(keep)):
+    for box_id in range(len(keep)):       
+        if tracking and target['track_queries_mask'][box_id]:
+            # Increment property index for tracked boxes
+            prop_i += 1
+        
+        if not keep[box_id]:
+            continue
+
         process_and_visualize_box(
             ax,
             prop_i,
@@ -524,10 +528,6 @@ def process_and_visualize_boxes(
             track_ids,
             cmap
         )
-
-        if tracking and target['track_queries_mask'][box_id]:
-            # Increment property index for tracked boxes
-            prop_i += 1
 
 
 def vis_results(
