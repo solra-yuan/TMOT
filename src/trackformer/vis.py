@@ -13,6 +13,7 @@ from visdom import Visdom
 from packaging.version import Version
 
 from .util.plot_utils import fig_to_numpy
+from mpl_toolkits.axes_grid1.inset_locator import inset_axes
 
 logging.getLogger('visdom').setLevel(logging.CRITICAL)
 
@@ -321,7 +322,7 @@ def visualize_frame_targets(axarr, target, frame_prefixes=['prev', 'prev_prev'])
     - frame_prefixes: A list of frame prefixes to visualize.
     """
     # Initialize the index for subplot axes.
-    i = 1
+    i = 0
 
     for frame_prefix in frame_prefixes:
         # Check if the target contains the target information for the current frame prefix.
@@ -338,38 +339,64 @@ def visualize_frame_targets(axarr, target, frame_prefixes=['prev', 'prev_prev'])
 
 
 def prepare_images_and_ids(target, img, frame_prefixes, inv_normalize):
-    imgs = [inv_normalize(img[:3]).cpu()]
+    img_groups = [[inv_normalize(img[:3]).cpu(), img[3:].cpu()]]
     img_ids = [target['image_id'].item()]
 
     for key in frame_prefixes:
         if f'{key}_image' in target:
-            imgs.append(inv_normalize(target[f'{key}_image'][:3]).cpu())
+            img_groups.append(
+                [inv_normalize(target[f'{key}_image'][:3]).cpu(), img[3:].cpu()])
             img_ids.append(target[f'{key}_target'][f'image_id'].item())
 
-    return imgs, img_ids
+    return img_groups, img_ids
 
 
-def setup_figure(imgs, dpi=96):
-    figure, axarr = plt.subplots(len(imgs))
+def setup_figure(img_groups, dpi=96):
+    figure, axarr = plt.subplots(len(img_groups))
     figure.tight_layout()
     figure.set_dpi(dpi)
     figure.set_size_inches(
-        imgs[0].shape[2] / dpi,
-        imgs[0].shape[1] * len(imgs) / dpi
+        img_groups[0][0].shape[2] * 2 / dpi,
+        img_groups[0][0].shape[1] * len(img_groups) / dpi
     )
 
-    if len(imgs) == 1:
+    if len(img_groups) == 1:
         axarr = [axarr]
 
     return figure, axarr
 
 
-def display_images(axarr, imgs, img_ids):
-    for ax, img, img_id in zip(axarr, imgs, img_ids):
+def display_images(axarr, img_groups, img_ids):
+    axs = []
+    for ax, img_group, img_id in zip(axarr, img_groups, img_ids):
         ax.set_axis_off()
-        ax.imshow(img.permute(1, 2, 0).clamp(0, 1))
 
-        draw_text(ax, 0, 0, f'IMG_ID={img_id}')
+        ax1 = inset_axes(
+            ax,
+            width="50%",
+            height="100%",
+            loc='center left',
+            borderpad=0
+        )
+        ax1.imshow(img_group[0].permute(1, 2, 0).clamp(0, 1))
+        ax1.set_axis_off()  # 축 제거
+
+        ax2 = inset_axes(
+            ax,
+            width="50%",
+            height="100%",
+            loc='center right',
+            borderpad=0
+        )
+        ax2.imshow(img_group[1].squeeze(), cmap='gray')
+        ax2.set_axis_off()  # 축 제거
+
+        draw_text(ax1, 0, 0, f'IMG_ID={img_id}')
+
+        axs.append(ax1)
+        axs.append(ax2)
+
+    return axs
 
 
 def process_detection_box(
@@ -465,7 +492,8 @@ def process_and_visualize_box(
     rect_color = 'red' if tracking and target['track_queries_fal_pos_mask'][box_id] else 'green'
     offset = 50 if tracking and target['track_queries_mask'][box_id] else 0
     class_id = result['labels'][box_id]
-    text = f"class: {class_id}\n" + f"score(one class): {result['scores'][box_id]:0.2f}"
+    text = f"class: {class_id}\n" + \
+        f"score(one class): {result['scores'][box_id]:0.2f}"
 
     if tracking:
         if target['track_queries_fal_pos_mask'][box_id]:
@@ -488,7 +516,7 @@ def process_and_visualize_box(
     if 'masks' in result:
         mask = result['masks'][box_id][0].numpy()
         draw_mask(ax, mask, cmap=colors.ListedColormap([cmap(box_id)]))
-    
+
     return prop_i
 
 
@@ -500,7 +528,7 @@ def process_and_visualize_boxes(
     tracking,
     track_ids,
     cmap
-):  
+):
     """
     Iterates over each box and visualizes it based on the keep condition and tracking information.
 
@@ -520,8 +548,7 @@ def process_and_visualize_boxes(
     # Counter for the property index, used when tracking is enabled
     prop_i = 0
 
-    for box_id in range(len(keep)):       
-
+    for box_id in range(len(keep)):
         prop_i = process_and_visualize_box(
             ax,
             box_id,
@@ -533,6 +560,7 @@ def process_and_visualize_boxes(
             track_ids,
             cmap
         )
+
 
 def vis_results(
     visualizer,
@@ -548,7 +576,7 @@ def vis_results(
         std=[1 / 0.229, 1 / 0.224, 1 / 0.255]
     )
 
-    imgs, img_ids = prepare_images_and_ids(
+    img_groups, img_ids = prepare_images_and_ids(
         target,
         img,
         frame_prefixes,
@@ -556,9 +584,7 @@ def vis_results(
     )
 
     # img.shape=[3, H, W]
-    figure, axarr = setup_figure(imgs)
-    display_images(axarr, imgs, img_ids)
-
+    figure, axarr = setup_figure(img_groups)
     num_track_queries = num_track_queries_with_id = 0
     if tracking:
         num_track_queries = len(target['track_query_boxes'])
@@ -569,8 +595,10 @@ def vis_results(
 
     cmap = get_hsv_color_map(len(keep))
 
+    axs = display_images(axarr, img_groups, img_ids)
+
     process_and_visualize_boxes(
-        axarr[0],
+        axs[0],
         keep,
         result,
         target,
@@ -591,10 +619,10 @@ def vis_results(
         num_track_queries,
         num_track_queries_with_id
     )
-    axarr[0].legend(handles=legend_handles)
+    axs[0].legend(handles=legend_handles)
 
     visualize_frame_targets(
-        axarr,
+        axs[2:],
         target,
         frame_prefixes=frame_prefixes
     )
