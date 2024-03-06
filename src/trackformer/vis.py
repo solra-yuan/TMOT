@@ -399,68 +399,6 @@ def display_images(axarr, img_groups, img_ids):
     return axs
 
 
-def process_detection_box(
-    ax,
-    box_id,
-    result,
-    target,
-    tracking,
-    track_ids,
-    cmap
-):
-    rect_color = 'green'
-    offset = 0
-    scores_text = f"{result['scores'][box_id]:0.2f}"
-
-    if tracking:
-        if target['track_queries_fal_pos_mask'][box_id]:
-            rect_color = 'red'
-        elif target['track_queries_mask'][box_id]:
-            offset = 50
-            rect_color = 'blue'
-            scores_text = (
-                f"{track_ids[box_id]}\n"
-                f"{scores_text}\n"
-                f"{result['track_queries_with_id_iou'][box_id]:0.2f}"
-            )
-
-    result_boxes = clip_boxes_to_image(
-        result['boxes'],
-        target['size']
-    )
-    x1, y1, x2, y2 = result_boxes[box_id]
-
-    draw_rectangle(ax, x1, y1, x2, y2, color=rect_color)
-    draw_text(ax, x1, y1 + offset, scores_text)
-
-    if 'masks' in result:
-        mask = result['masks'][box_id][0].numpy()
-        draw_mask(ax, mask, cmap=colors.ListedColormap([cmap(box_id)]))
-
-
-def process_all_detection_boxes(
-    axarr,
-    result,
-    target,
-    tracking,
-    track_ids,
-    keep
-):
-    cmap = get_hsv_color_map(len(keep))
-
-    # np.nonzero(keep) returns indices of True elements
-    for box_id in np.nonzero(keep)[0]:
-        process_detection_box(
-            axarr[0],
-            box_id,
-            result,
-            target,
-            tracking,
-            track_ids,
-            cmap
-        )
-
-
 def process_and_visualize_box(
     ax,
     box_id,
