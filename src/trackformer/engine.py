@@ -129,7 +129,7 @@ def train_one_epoch(model: torch.nn.Module, criterion: torch.nn.Module, postproc
         # in order to be able to modify targets inside the forward call we need
         # to pass it through as torch.nn.parallel.DistributedDataParallel only
         # passes copies
-        outputs, targets, *_ = model(samples, targets)
+        outputs, targets, features, *_ = model(samples, targets)
 
         loss_dict = criterion(outputs, targets)  # loss criterion(custom class(inherited by nn.Module)) defined in DETR
         weight_dict = criterion.weight_dict  # weight_dict item indicates 3 types of loss "types"' weight(ce, bbox, giou.)
@@ -172,13 +172,16 @@ def train_one_epoch(model: torch.nn.Module, criterion: torch.nn.Module, postproc
                 samples.unmasked_tensor(0),
                 results[0],
                 targets[0],
-                args.tracking)
+                args.tracking,
+                features
+            )
 
     # gather the stats from all processes
     metric_logger.synchronize_between_processes()
     print("Averaged stats:", metric_logger)
 
     return {k: meter.global_avg for k, meter in metric_logger.meters.items()}
+
 
 def config_update(dataset_name, is_rgb_t, data_loader, obj_detector_model):
     config_updates = {
@@ -187,10 +190,8 @@ def config_update(dataset_name, is_rgb_t, data_loader, obj_detector_model):
         'frame_range': data_loader.dataset.frame_range,
         'obj_detector_model': obj_detector_model}
     if is_rgb_t:
-        thermal_dataset_name = [name + "_rgb_t" 
-                                for name in config_updates['dataset_name']]
+        thermal_dataset_name = [name + "_rgb_t" for name in config_updates['dataset_name']]
         config_updates['dataset_name'] = thermal_dataset_name
-    
     return config_updates
 
 @torch.no_grad()
@@ -222,7 +223,7 @@ def evaluate(model, criterion, postprocessors, data_loader, device,
         samples = samples.to(device)
         targets = [utils.nested_dict_to_device(t, device) for t in targets]
 
-        outputs, targets, *_ = model(samples, targets)
+        outputs, targets, features, *_ = model(samples, targets)
 
         loss_dict = criterion(outputs, targets)
         weight_dict = criterion.weight_dict
@@ -247,7 +248,9 @@ def evaluate(model, criterion, postprocessors, data_loader, device,
                 samples.unmasked_tensor(0),
                 results[0],
                 targets[0],
-                args.tracking)
+                args.tracking,
+                features
+            )
         else:
             results_orig, _ = make_results(outputs, targets, postprocessors, args.tracking)
 
@@ -310,7 +313,7 @@ def evaluate(model, criterion, postprocessors, data_loader, device,
         
         for i, seq in enumerate(seqs):
             rank = i % utils.get_world_size()
-            seqs_per_rank[rank].append(seq)                              
+            seqs_per_rank[rank].append(seq)    
 
         # only evaluate one seq in debug mode
         if args.debug:

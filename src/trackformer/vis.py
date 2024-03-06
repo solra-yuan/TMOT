@@ -505,7 +505,8 @@ def vis_results(
     img,
     result,
     target,
-    tracking
+    tracking,
+    features
 ):
     frame_prefixes = ['prev', 'prev_prev']
 
@@ -572,6 +573,32 @@ def vis_results(
     plt.close()
 
     visualizer.plot(img)
+
+    layer4to3 = features[0].tensors[0]
+
+    # 텐서의 최소값과 최대값을 구합니다.
+    min_val = layer4to3.min()
+    max_val = layer4to3.max()
+    
+    # [0, 1] 범위로 정규화합니다.
+    layer4to3 = (layer4to3 - min_val) / (max_val - min_val)
+    
+    # [0, 255] 범위로 스케일링합니다.
+    layer4to3 = layer4to3 * 255
+    
+    # 결과 텐서의 데이터 타입을 부호 없는 8비트 정수로 변환합니다.
+    layer4to3 = layer4to3.to(torch.uint8)
+
+    visualizer.viz.images(
+        layer4to3,
+        nrow=1,
+        opts={
+            'title': '4to3',
+            'width': 2500, 
+            'height': 2500
+        },
+        win='4to3',
+    )
 
 
 def build_visualizers(
