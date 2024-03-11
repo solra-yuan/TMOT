@@ -499,20 +499,6 @@ def process_and_visualize_boxes(
             cmap
         )
 
-def total_minmax_scaler(layer4to3):
-    # 텐서의 최소값과 최대값을 구합니다.
-    min_val = layer4to3.min()
-    max_val = layer4to3.max()
-    # [0, 1] 범위로 정규화합니다.
-    layer4to3 = (layer4to3 - min_val) / (max_val - min_val)
-    # [0, 255] 범위로 스케일링합니다.
-    layer4to3 = layer4to3 * 255
-    # 결과 텐서의 데이터 타입을 부호 없는 8비트 정수로 변환합니다.
-    layer4to3 = layer4to3.to(torch.uint8)
-
-    return layer4to3
-
-
 def vis_results(
     visualizer,
     img,
@@ -587,19 +573,30 @@ def vis_results(
 
     visualizer.plot(img)
 
-    layer4to3 = features[0].tensors[0]
-    layer4to3 = total_minmax_scaler(layer4to3)
+    tensor = features[0].tensors[0]
 
     visualizer.viz.images(
-        layer4to3,
+        NormalizeHelper.per_channel(tensor),
         nrow=1,
         opts={
-            'title': '4to3',
+            'title': '4to3_per_channel',
             'width': 1200, 
-            'height': 800
+            'height': 1200,
         },
-        win='4to3',
+        win='4to3_per_channel',
     )
+
+    visualizer.viz.images(
+        NormalizeHelper.across_channels(tensor),
+        nrow=1,
+        opts={
+            'title': '4to3_across',
+            'width': 1200, 
+            'height': 1200,
+        },
+        win='4to3_across',
+    )
+
 
 
 def build_visualizers(
