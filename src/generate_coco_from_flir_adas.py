@@ -23,6 +23,16 @@ parser.add_argument(
 
 args = parser.parse_args()
 
+#---
+def set_split_frame_range(
+    frame_range_for_split,
+    train_and_val_share_sequence,
+    split_frame_ratio=0.8
+):
+    if train_and_val_share_sequence:
+        frame_range_for_split['train']['end'] = split_frame_ratio
+        frame_range_for_split['val']['start'] = split_frame_ratio
+#----
 
 class CustomDatasetDict(TypedDict):
     """
@@ -56,7 +66,10 @@ DATA_PARSE_LIST = [
     'flir_adas_v2_thermal_small'
 ]
 
-VIS_THRESHOLD = 0.25
+dataset_base_path = '/mnt/y/Datasets/flir_adas_v2'
+VIS_THRESHOLD = 0.25 ## <<<<
+TRAIN_AND_VAL_SHARE_SEQUENCE = True ## >>>>
+SPLIT_FRAME_RATIO = 0.8 ## >>>>
 
 # add custom sequence info here
 CUSTOM_SEQS_INFO_DICT = {}
@@ -67,12 +80,18 @@ for dataitem in DATA_PARSE_LIST:
                 'video-BzZspxAweF8AnKhWK': {'img_width': 1024, 'img_height': 1224, 'seq_length': 338},
                 'video-FkqCGijjAKpABetZZ': {'img_width': 1024, 'img_height': 1224, 'seq_length': 226},
                 'video-PGdt7pJChnKoJDt35': {'img_width': 1024, 'img_height': 1224, 'seq_length': 208},
-                'video-RMxN6a4CcCeLGu4tA': {'img_width': 768, 'img_height': 1024, 'seq_length': 1033}
-            },
-            'val_sequences': {
+                'video-RMxN6a4CcCeLGu4tA': {'img_width': 768, 'img_height': 1024, 'seq_length': 1033},
                 'video-YnfPeH8i2uBWmsSd2': {'img_width': 1024, 'img_height': 1224, 'seq_length': 540},
                 'video-dvZBYnphN2BwdMKBc': {'img_width': 768, 'img_height': 1024, 'seq_length': 565}
-            },
+            }, ## >>>>
+            'val_sequences': {
+                'video-BzZspxAweF8AnKhWK': {'img_width': 1024, 'img_height': 1224, 'seq_length': 338},
+                'video-FkqCGijjAKpABetZZ': {'img_width': 1024, 'img_height': 1224, 'seq_length': 226},
+                'video-PGdt7pJChnKoJDt35': {'img_width': 1024, 'img_height': 1224, 'seq_length': 208},
+                'video-RMxN6a4CcCeLGu4tA': {'img_width': 768, 'img_height': 1024, 'seq_length': 1033},
+                'video-YnfPeH8i2uBWmsSd2': {'img_width': 1024, 'img_height': 1224, 'seq_length': 540},
+                'video-dvZBYnphN2BwdMKBc': {'img_width': 768, 'img_height': 1024, 'seq_length': 565}
+            }, ## >>>>
             'test_sequences': {
                 'video-hnbGXq3nNPjBbc7CL': {'img_width': 1024, 'img_height': 1224, 'seq_length': 411},
                 'video-msNEBxJE5PPDqenBM': {'img_width': 1024, 'img_height': 1224, 'seq_length': 428}
@@ -85,8 +104,14 @@ for dataitem in DATA_PARSE_LIST:
                 'video-6tLtjdkv5K5BuhB37': {'img_width': 512, 'img_height': 640, 'seq_length': 226},
                 'video-vbrSzr4vFTm5QwuGH': {'img_width': 512, 'img_height': 640, 'seq_length': 208},
                 'video-ZAtDSNuZZjkZFvMAo': {'img_width': 512, 'img_height': 640, 'seq_length': 1033},
-            },
+                'video-ePoikf5LyTTfqchga': {'img_width': 512, 'img_height': 640, 'seq_length': 540},
+                'video-t3f7QC8hZr6zYXpEZ': {'img_width': 512, 'img_height': 640, 'seq_length': 565},
+            }, ## >>>>
             'val_sequences': {
+                'video-4FRnNpmSmwktFJKjg': {'img_width': 512, 'img_height': 640, 'seq_length': 338},
+                'video-6tLtjdkv5K5BuhB37': {'img_width': 512, 'img_height': 640, 'seq_length': 226},
+                'video-vbrSzr4vFTm5QwuGH': {'img_width': 512, 'img_height': 640, 'seq_length': 208},
+                'video-ZAtDSNuZZjkZFvMAo': {'img_width': 512, 'img_height': 640, 'seq_length': 1033},
                 'video-ePoikf5LyTTfqchga': {'img_width': 512, 'img_height': 640, 'seq_length': 540},
                 'video-t3f7QC8hZr6zYXpEZ': {'img_width': 512, 'img_height': 640, 'seq_length': 565},
             },
@@ -111,22 +136,38 @@ rgb_seq_to_thermal_seq = {
 if __name__ == '__main__':
     def generate_coco_flir(
         name: str,
-        data_root: str,
-        save_root: str,
+        data_root: str, ## <<<<
+        save_root: str, ## <<<<
         is_thermal: bool = False,
-        frame_range: FrameRangeDict = {'start': 0.0, 'end': 1.0}
+        frame_range: FrameRangeDict = {'start': 0.0, 'end': 1.0},
+        train_and_val_share_sequence=False ## <<<<
     ):
-
+        # ---- <<<<
         if is_thermal:
             split_names_list = ['train_coco_t', 'val_coco_t', 'test_coco_t']
             root_split = 'train_t'
         else:
             split_names_list = ['train_coco', 'val_coco', 'test_coco']
             root_split = 'train'
-
+        # ---- <<<<
+        # ---- >>>>
+        frame_range_for_split = {
+            'train': {'start': 0.0, 'end': 1.0},
+            'val': {'start': 0.0, 'end': 1.0},
+            'test': {'start': 0.0, 'end': 1.0}
+        }
+        set_split_frame_range(
+            frame_range_for_split,
+            train_and_val_share_sequence,
+            split_frame_ratio=SPLIT_FRAME_RATIO
+        )
+        # ---- >>>>
         for splited_name in split_names_list:
+            splited_name_phase = splited_name.split('_')[0]
             seqs_names_from_splited_name = "".join(
-                [splited_name.split('_')[0], '_sequences'])
+                [splited_name_phase, '_sequences'])
+
+            frame_range = frame_range_for_split[splited_name_phase] # >>>>
 
             if is_thermal:
                 print('is_thermal')
@@ -157,10 +198,8 @@ if __name__ == '__main__':
     with open(args.path) as f:
         parse_list: list[CustomDatasetDict] = json.load(f)
 
-    for payload in parse_list:
-        generate_coco_flir(
-            name=payload['name'],
-            data_root=payload['data_root'],
-            save_root=payload['save_root'],
-            is_thermal=payload['is_thermal'],
-        )
+    for payload in parse_list: # >>>>
+        generate_coco_flir(name=payload['name'],
+                           is_thermal=payload['is_thermal'],
+                           data_root=payload['data_root'],
+                           train_and_val_share_sequence=TRAIN_AND_VAL_SHARE_SEQUENCE)
