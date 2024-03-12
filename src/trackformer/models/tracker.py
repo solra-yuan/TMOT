@@ -48,14 +48,15 @@ class Tracker:
             attention_data['hooks'].append(hook)
 
             def add_attention_map_to_data(self, input, output):
-                height, width = attention_data['conv_features']['3'].tensors.shape[-2:]
+                height, width = attention_data['conv_features']['4'].tensors.shape[-2:]
                 attention_maps = output[1].view(-1, height, width)
 
                 attention_data.update({'maps': attention_maps})
 
             multihead_attn = self.obj_detector.transformer.decoder.layers[-1].multihead_attn
             hook = multihead_attn.register_forward_hook(
-                add_attention_map_to_data)
+                add_attention_map_to_data
+            )
             attention_data['hooks'].append(hook)
 
             self.attention_data = attention_data
