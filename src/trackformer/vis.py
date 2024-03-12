@@ -14,6 +14,7 @@ from packaging.version import Version
 
 from .util.plot_utils import fig_to_numpy
 from mpl_toolkits.axes_grid1.inset_locator import inset_axes
+from .NormalizeHelper import NormalizeHelper
 
 logging.getLogger('visdom').setLevel(logging.CRITICAL)
 
