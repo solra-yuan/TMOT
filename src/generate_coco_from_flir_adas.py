@@ -139,8 +139,7 @@ if __name__ == '__main__':
         data_root: str, ## <<<<
         save_root: str, ## <<<<
         is_thermal: bool = False,
-        frame_range: FrameRangeDict = {'start': 0.0, 'end': 1.0},
-        train_and_val_share_sequence=False ## <<<<
+        train_and_val_share_sequence=False
     ):
         # ---- <<<<
         if is_thermal:
