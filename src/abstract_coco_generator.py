@@ -111,7 +111,7 @@ class AbstractCocoGenerator(ABC):
         coco_dir = os.path.join(self.save_root, self.split_name)
         if os.path.isdir(coco_dir):
             shutil.rmtree(coco_dir)
-        os.mkdir(coco_dir)
+        os.makedirs(coco_dir)
 
         annotations_dir = os.path.join(self.save_root, 'annotations')
         if not os.path.isdir(annotations_dir):
