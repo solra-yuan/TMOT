@@ -26,4 +26,4 @@ jobs:
         run: docker pull ghcr.io/solra-yuan/trackformer-sdk-test
 
       - name: Run unit tests
-        run: docker -v .:/app/TMOT run ghcr.io/USERNAME/IMAGE_NAME:TAG pytest 
+        run: docker -v .:/app/TMOT run ghcr.io/USERNAME/IMAGE_NAME:TAG cd /app/TMOT/src && pytest 
