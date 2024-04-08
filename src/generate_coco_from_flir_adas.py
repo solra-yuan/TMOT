@@ -1,6 +1,6 @@
 import argparse
 import json
-import os
+from os import environ
 from typing import TypedDict
 from FlirCocoGenerator import FlirCocoGenerator
 from FlirThermalCocoGenerator import FlirThermalCocoGenerator
@@ -13,23 +13,15 @@ except ImportError:
 
 parser = argparse.ArgumentParser(description='Argparse Example')
 
-parser.add_argument('--data_root',
-                    type=str,
-                    default=os.environ.get(
-                        "FLIR_DATA_ROOT") or 'data/flir_adas_v2/',
-                    help='Example number')
+parser.add_argument(
+    '--path',
+    type=str,
+    default=environ.get("DATA_PATH") or './src/coco_parser_custom.json',
+    help='Dataset path'
+)
 
-parser.add_argument('--save_root',
-                    type=str,
-                    default=os.environ.get(
-                        "FLIR_SAVE_ROOT") or 'data/flir_adas_v2/',
-                    help='Example number')
 
 args = parser.parse_args()
-# The root directory of the original dataset before parsing
-FLIR_DATA_ROOT = args.data_root
-# The dataset is saved in the directory after generated as coco tracking format
-FLIR_SAVE_ROOT = args.save_root
 
 
 class CustomDatasetDict(TypedDict):
@@ -51,7 +43,7 @@ class CustomDatasetDict(TypedDict):
 
     '''
 
-    data_root: str 
+    data_root: str
     '''
         The root directory of the dataset.
     '''
@@ -64,8 +56,7 @@ DATA_PARSE_LIST = [
     'flir_adas_v2_thermal_small'
 ]
 
-dataset_base_path = '/mnt/y/Datasets/flir_adas_v2'
-VIS_THRESHOLD = 0.25 
+VIS_THRESHOLD = 0.25
 
 # add custom sequence info here
 CUSTOM_SEQS_INFO_DICT = {}
@@ -120,8 +111,9 @@ rgb_seq_to_thermal_seq = {
 if __name__ == '__main__':
     def generate_coco_flir(
         name: str,
+        data_root: str,
+        save_root: str,
         is_thermal: bool = False,
-        data_root: str = FLIR_DATA_ROOT,
         frame_range: FrameRangeDict = {'start': 0.0, 'end': 1.0}
     ):
 
@@ -141,29 +133,34 @@ if __name__ == '__main__':
                 print(name, seqs_names_from_splited_name)
                 print(CUSTOM_SEQS_INFO_DICT[name]
                       [seqs_names_from_splited_name])
-                generator = FlirThermalCocoGenerator(split_name=splited_name,
-                                                     seqs_names=CUSTOM_SEQS_INFO_DICT[name][seqs_names_from_splited_name],
-                                                     root_split=root_split,
-                                                     frame_range=frame_range,
-                                                     data_root=data_root,
-                                                     rgb_seq_to_thermal_seq=rgb_seq_to_thermal_seq,
-                                                     save_root=FLIR_SAVE_ROOT,
-                                                     dataset_base_path=None)
+                generator = FlirThermalCocoGenerator(
+                    split_name=splited_name,
+                    seqs_names=CUSTOM_SEQS_INFO_DICT[name][seqs_names_from_splited_name],
+                    root_split=root_split,
+                    frame_range=frame_range,
+                    data_root=data_root,
+                    rgb_seq_to_thermal_seq=rgb_seq_to_thermal_seq,
+                    save_root=save_root
+                )
             else:
-                generator = FlirCocoGenerator(split_name=splited_name,
-                                              seqs_names=CUSTOM_SEQS_INFO_DICT[name][seqs_names_from_splited_name],
-                                              root_split=root_split,
-                                              frame_range=frame_range,
-                                              data_root=data_root,
-                                              save_root=FLIR_SAVE_ROOT,
-                                              dataset_base_path=None)
+                generator = FlirCocoGenerator(
+                    split_name=splited_name,
+                    seqs_names=CUSTOM_SEQS_INFO_DICT[name][seqs_names_from_splited_name],
+                    root_split=root_split,
+                    frame_range=frame_range,
+                    data_root=data_root,
+                    save_root=save_root,
+                )
 
             generator.generate()
 
-    with open('./src/coco_parser_custom.json') as f:
+    with open(args.path) as f:
         parse_list: list[CustomDatasetDict] = json.load(f)
 
     for payload in parse_list:
-        generate_coco_flir(name=payload['name'],
-                           is_thermal=payload['is_thermal'],
-                           data_root=payload['data_root'])
+        generate_coco_flir(
+            name=payload['name'],
+            data_root=payload['data_root'],
+            save_root=payload['save_root'],
+            is_thermal=payload['is_thermal'],
+        )

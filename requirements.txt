@@ -3,6 +3,7 @@ future
 lap
 matplotlib
 motmetrics
+MultiScaleDeformableAttention
 numpy
 opencv-python
 pandas
