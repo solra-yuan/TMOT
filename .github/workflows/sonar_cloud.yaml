@@ -2,9 +2,9 @@ name: Sonar cloud
 
 on:
   push:
-    branches: [ main, TMOT ]
+    branches: [ main, thermal-rgb ]
   pull_request:
-    branches: [ main, TMOT ]
+    branches: [ main, thermal-rgb ]
   workflow_dispatch:
 
 jobs:
