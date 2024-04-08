@@ -1,0 +1,29 @@
+name: Sonar cloud
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+  
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v1
+        with:
+          registry: ghcr.io
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.CR_PAT }}
+
+      - name: Pull Docker image
+        run: docker pull ghcr.io/solra-yuan/trackformer-sdk-test
+
+      - name: Run unit tests
+        run: docker -v .:/app/TMOT run ghcr.io/USERNAME/IMAGE_NAME:TAG pytest 
