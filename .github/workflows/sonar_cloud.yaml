@@ -1,0 +1,43 @@
+name: Sonar cloud
+
+on:
+  push:
+    branches: [ main ]
+  pull_request:
+    branches: [ main ]
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+  
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v2
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v1
+        with:
+          registry: ghcr.io
+          username: ${{ github.repository_owner }}
+          password: ${{ secrets.CR_PAT }}
+
+      - name: Pull Docker image
+        run: docker pull ghcr.io/solra-yuan/trackformer-sdk-test
+
+      - name: Run unit tests
+        run: docker run -v ${{ github.workspace }}:/app/TMOT --rm ghcr.io/solra-yuan/trackformer-sdk-test /bin/bash -c "cd /app/TMOT && pytest ./src --cov=. --cov-report=xml:coverage.xml"
+
+      - name: SonarCloud Scan
+        uses: SonarSource/sonarcloud-github-action@master
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          SONAR_TOKEN: ${{ secrets.SONAR_TOKEN }}
+        with:
+          args: >
+            -Dsonar.projectKey=solra-yuan_TMOT
+            -Dsonar.organization=solra-yuan
+            -Dsonar.sources=./src
+            -Dsonar.host.url=https://sonarcloud.io
+            -Dsonar.login=${{ secrets.SONAR_TOKEN }}
+            -Dsonar.python.coverage.reportPaths=${{ github.workspace }}/coverage.xml
