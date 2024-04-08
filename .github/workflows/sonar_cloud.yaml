@@ -26,7 +26,7 @@ jobs:
         run: docker pull ghcr.io/solra-yuan/trackformer-sdk-test
 
       - name: Run unit tests
-        run: docker run -v ${{ github.workspace }}:/app/TMOT --rm ghcr.io/solra-yuan/trackformer-sdk-test /bin/bash -c "cd /app/TMOT && pytest ./src --cov=. --cov-report=xml:coverage.xml"
+        run: docker run --gpus all -v ${{ github.workspace }}:/app/TMOT --rm ghcr.io/solra-yuan/trackformer-sdk-test /bin/bash -c "cd /app/TMOT && pytest ./src --cov=. --cov-report=xml:coverage.xml"
 
       - name: SonarCloud Scan
         uses: SonarSource/sonarcloud-github-action@master
