@@ -33,6 +33,7 @@ class Tracker:
         self.reid_greedy_matching = tracker_cfg['reid_greedy_matching']
         self.prev_frame_dist = tracker_cfg['prev_frame_dist']
         self.steps_termination = tracker_cfg['steps_termination']
+        #print(f"[DEBUG] Tracker initialized: track_num=None, results=None")
 
         if self.generate_attention_maps:
             assert hasattr(self.obj_detector.transformer.decoder.layers[-1], 'multihead_attn'), 'Generation of attention maps not possible for deformable DETR.'
@@ -78,12 +79,14 @@ class Tracker:
             self.results = {}
             self.frame_index = 0
             self.num_reids = 0
-
+            #print(f"[DEBUG] Tracker reset: track_num={self.track_num}, results cleared")
+        
     @property
     def device(self):
         return next(self.obj_detector.parameters()).device
 
     def tracks_to_inactive(self, tracks):
+        #print(f"[DEBUG] Moving tracks to inactive: {[t.id for t in tracks]}")
         self.tracks = [t for t in self.tracks if t not in tracks]
 
         for track in tracks:
@@ -94,17 +97,22 @@ class Tracker:
         """Initializes new Track objects and saves them."""
         new_track_ids = []
         for i in range(len(pos)):
+            # debug ---
+            new_id = self.track_num + i
+            # print(f"[DEBUG] Adding track: track_id={new_id}, position={pos[i]}, score={scores[i]}")
+            # debug ---
             self.tracks.append(Track(
                 pos[i],
                 scores[i],
-                self.track_num + i,
+                new_id,  # create track_id
                 hs_embeds[i],
                 indices[i],
                 None if masks is None else masks[i],
                 None if attention_maps is None else attention_maps[i],
             ))
-            new_track_ids.append(self.track_num + i)
+            new_track_ids.append(new_id)
         self.track_num += len(new_track_ids)
+        # print(f"[DEBUG] Updated track_num: {self.track_num}")
 
         if new_track_ids:
             self._logger(
@@ -167,7 +175,9 @@ class Tracker:
     def reid(self, new_det_boxes, new_det_scores, new_det_hs_embeds,
              new_det_masks=None, new_det_attention_maps=None):
         """Tries to ReID inactive tracks with provided detections."""
-
+        
+        # print(f"[DEBUG] ReID called with {len(new_det_boxes)} detections")
+        # print(f"[DEBUG] Inactive tracks before ReID: {[t.id for t in self.inactive_tracks]}")
         self.inactive_tracks = [
             t for t in self.inactive_tracks
             if t.has_positive_area() and t.count_inactive <= self.inactive_patience
@@ -260,6 +270,7 @@ class Tracker:
 
         for ind in assigned_indices:
             reid_mask[ind] = False
+        #print(f"[DEBUG] Inactive tracks after ReID: {[t.id for t in self.inactive_tracks]}")
 
         return reid_mask
 
@@ -267,6 +278,9 @@ class Tracker:
         """This function should be called every timestep to perform tracking with a blob
         containing the image information.
         """
+        #print(f"[DEBUG] Step called: frame_index={self.frame_index}, track_num={self.track_num}")
+        #print(f"[DEBUG] Active tracks: {[t.id for t in self.tracks]}")
+        #print(f"[DEBUG] Inactive tracks: {[t.id for t in self.inactive_tracks]}")
         self.inactive_tracks = [
             t for t in self.inactive_tracks
             if t.has_positive_area() and t.count_inactive <= self.inactive_patience
@@ -525,6 +539,7 @@ class Tracker:
 
         for track in self.tracks:
             if track.id not in self.results:
+                #print(f"[DEBUG] Initializing results for track_id={track.id}")
                 self.results[track.id] = {}
 
             self.results[track.id][self.frame_index] = {}
@@ -542,6 +557,7 @@ class Tracker:
             if track.attention_map is not None:
                 self.results[track.id][self.frame_index]['attention_map'] = \
                     track.attention_map.cpu().numpy()
+            print(f"[DEBUG] Updated results for track_id={track.id}: {self.results[track.id][self.frame_index]}")
 
         for t in self.inactive_tracks:
             t.count_inactive += 1
@@ -554,6 +570,10 @@ class Tracker:
 
     def get_results(self):
         """Return current tracking results."""
+        print(f"[DEBUG] get_results called: {len(self.results)} tracks")
+        for track_id, frames in self.results.items():
+            print(f"[DEBUG] Track ID={track_id}, Frames={len(frames)}")
+
         return self.results
 
 

@@ -603,6 +603,27 @@ def build_visualizers(
     args: dict,
     train_loss_names: list
 ):
+    """
+    build the visualizer that stores and manages the configuration during training/evaluation
+    parameters :
+        - args (dict)
+        - train_loss_names (list)
+    Returns : 
+        - dict : A dictionary containing the visualizer configurations for the specified keys 
+            Keys: 
+                - 'train' : Configuration dictionary used during the training phase.
+                    Keys:
+                        - 'iter_metrics'(LineVis)
+                        - 'epoch_metrics'(LineVis)
+                        - 'epoch_eval'(LineVis)
+                        - 'example_results'(ImgVis)
+                - 'val' : Configuration used during the validation phase
+                    Keys:
+                        - 'epoch_metrics'(LineVis)
+                        - 'epoch_eval'(LineVis)
+                        - 'example_results'(ImgVis)
+    """
+
     visualizers = {}
     visualizers['train'] = {}
     visualizers['val'] = {}
