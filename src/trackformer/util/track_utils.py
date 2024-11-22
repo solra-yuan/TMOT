@@ -66,6 +66,8 @@ def rand_cmap(nlabels, type='bright', first_color_black=True, last_color_black=F
     import numpy as np
     from matplotlib.colors import LinearSegmentedColormap
 
+    if nlabels <= 0:
+        raise ValueError("Number of labels must be greater than 0")
 
     if type not in ('bright', 'soft'):
         print ('Please choose "bright" or "soft" for type')
@@ -78,7 +80,7 @@ def rand_cmap(nlabels, type='bright', first_color_black=True, last_color_black=F
     if type == 'bright':
         randHSVcolors = [(np.random.uniform(low=0.0, high=1),
                           np.random.uniform(low=0.2, high=1),
-                          np.random.uniform(low=0.9, high=1)) for i in range(nlabels)]
+                          np.random.uniform(low=0.9, high=1)) for i in range(nlabels+1)]
 
         # Convert HSV list to RGB
         randRGBcolors = []
@@ -140,7 +142,7 @@ def plot_sequence(tracks, data_loader, output_dir, write_images, generate_attent
     # styles = defaultdict(lambda: next(loop_cy_iter))
 
     # cmap = plt.cm.get_cmap('hsv', )
-    mx = 0
+    mx = 1
     for track_id, track_data in tracks.items():
         mx = max(mx, track_id)
     cmap = rand_cmap(mx, type='bright', first_color_black=False, last_color_black=False, verbose=True)
@@ -353,6 +355,35 @@ def warp_pos(pos, warp_matrix):
 
 
 def get_mot_accum(results, seq_loader):
+    """
+    Computes the MOT (Multiple Object Tracking) accumulator for tracking evaluation.
+
+    Parameters:
+        - results (dict): A dictionary containing tracking results.
+            Keys:
+                - track_id (int): The unique ID of the tracked object.
+            Values:
+                - dict: Contains frame data for each track.
+                    Keys:
+                        - frame_id (int): The frame number.
+                        - 'bbox' (list or array): Bounding box coordinates (x1, y1, x2, y2).
+        - seq_loader (iterable): An iterable that yields frame-by-frame ground truth data.
+            Each frame data should be a dictionary containing:
+                - 'gt' (dict): Ground truth object data.
+                    Keys:
+                        - gt_id (int): The unique ID of the ground truth object.
+                    Values:
+                        - list: Bounding box coordinates [x1, y1, x2, y2].
+
+    Returns:
+        - mot_accum (mm.MOTAccumulator): The MOTAccumulator object containing the tracking evaluation data.
+          This can be used to compute tracking metrics like MOTA, MOTP, IDF1, etc.
+
+    Description:
+        This function iterates over frames in the sequence loader, matches ground truth objects
+        with tracking results using IoU (Intersection over Union), and updates the MOTAccumulator
+        with the matching information for each frame.
+    """    
     mot_accum = mm.MOTAccumulator(auto_id=True)
 
     for frame_id, frame_data in enumerate(seq_loader):

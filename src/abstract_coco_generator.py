@@ -107,6 +107,15 @@ class AbstractCocoGenerator(ABC):
         self.orig_image_name_to_parsed_image_id = {}
 
     def __create_coco_directories(self):
+        """create directories 
+            - coco_dir : {save_root}/{split name}
+            - annotations_dir : {save_root}/annotations
+        Returns:
+            - coco_dir(os.path) : 
+            - annotations_dir(os.path) : 
+        Description:
+            create coco and annotation directory under the save_root directory
+        """
         import shutil
         coco_dir = os.path.join(self.save_root, self.split_name)
         if os.path.isdir(coco_dir):
@@ -145,6 +154,12 @@ class AbstractCocoGenerator(ABC):
         }
 
     def __load_gt_file_data(self):
+        """
+        A function that loads gt file data from root_split_path's direct parent/{self.gt_file_name}
+        
+        Returns:
+            A gt file(json format)
+        """
         from pathlib import Path
 
         # Construct the full path to the JSON file
@@ -161,7 +176,29 @@ class AbstractCocoGenerator(ABC):
             return json.load(gt_file)
 
     def __process_images_for_coco(self, coco_dir, seqs):
+        """
+        A function that creates unified image target ground truth list across all sequences
+        and creates symlink between {self.dataset_base_path}/{seq}/'img1'/{img}
+        (dataset base path) and coco directory(symlinkpath)
 
+        Args:
+            -coco_dir
+            -seqs
+
+        Returns:
+            images(list) : A list contains ground truth data of all video sequences in dataset.
+                iterates the video sequence in alphebet order.
+                list item(Dict) : represents each image. 
+                The sequence information is included in file_name field.
+                    Keys :
+                        - "file_name": f"{seq}_{img}",
+                        - "height": img_height,
+                        - "width": img_width,
+                        - "id": img_id,
+                        - "frame_id": i,
+                        - "seq_length": seq_length,
+                        - "first_frame_image_id": first_frame_image_id
+        """
         img_id = 0  # unified image id across all sequences
 
         images = []
@@ -278,6 +315,13 @@ class AbstractCocoGenerator(ABC):
         pass
 
     def generate(self):
+        """main function generates parsed coco tracking style ground truth json file
+        creates coco directory, 
+        process integrated images list information
+        load gt annotation file data
+        and process annotation
+        creates annotations for each split
+        """
         seqs = self.generate_sequences()
 
         print(self.split_name, seqs)
