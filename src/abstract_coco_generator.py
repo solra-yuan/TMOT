@@ -2,7 +2,7 @@ from abc import ABC, abstractmethod
 from typing import List, Dict, Optional, TypedDict
 import os
 import json
-
+import csv
 
 def load_sequence_config(config_file_path):
     from configparser import ConfigParser
@@ -79,6 +79,7 @@ class AbstractCocoGenerator(ABC):
         save_root: str,
         gt_file_name: str,
         dataset_base_path: Optional[str] = None,
+        mot_for_tracking_eval = True
     ):
         self.split_name = split_name
         self.seqs_names = seqs_names
@@ -105,8 +106,18 @@ class AbstractCocoGenerator(ABC):
         }
 
         self.orig_image_name_to_parsed_image_id = {}
+        self.mot_for_tracking_eval = mot_for_tracking_eval
 
     def __create_coco_directories(self):
+        """create directories 
+            - coco_dir : {save_root}/{split name}
+            - annotations_dir : {save_root}/annotations
+        Returns:
+            - coco_dir(os.path) : 
+            - annotations_dir(os.path) : 
+        Description:
+            create coco and annotation directory under the save_root directory
+        """
         import shutil
         coco_dir = os.path.join(self.save_root, self.split_name)
         if os.path.isdir(coco_dir):
@@ -145,6 +156,12 @@ class AbstractCocoGenerator(ABC):
         }
 
     def __load_gt_file_data(self):
+        """
+        A function that loads gt file data from root_split_path's direct parent/{self.gt_file_name}
+        
+        Returns:
+            A gt file(json format)
+        """
         from pathlib import Path
 
         # Construct the full path to the JSON file
@@ -161,7 +178,28 @@ class AbstractCocoGenerator(ABC):
             return json.load(gt_file)
 
     def __process_images_for_coco(self, coco_dir, seqs):
+        """
+        A function that creates unified image target ground truth list across all sequences
+        and creates symlink between {self.dataset_base_path}/{seq}/'img1'/{img}
+        (dataset base path) and coco directory(symlinkpath)
 
+        Args:
+            -coco_dir
+            -seqs
+        Returns:
+            images(list) : A list contains ground truth data of all video sequences in dataset.
+                iterates the video sequence in alphebet order.
+                list item(Dict) : represents each image. 
+                The sequence information is included in file_name field.
+                    Keys :
+                        - "file_name": f"{seq}_{img}",
+                        - "height": img_height,
+                        - "width": img_width,
+                        - "id": img_id,
+                        - "frame_id": i,
+                        - "seq_length": seq_length,
+                        - "first_frame_image_id": first_frame_image_id
+        """
         img_id = 0  # unified image id across all sequences
 
         images = []
@@ -231,8 +269,12 @@ class AbstractCocoGenerator(ABC):
             for img_dict
             in annot_json_data['images']
         }
-
+        mot_for_tracking_eval = self.mot_for_tracking_eval
+        print("mot_for_tracking_eval == {mot_for_tracking_eval}")
         for seq in seqs:
+            if mot_for_tracking_eval == True:
+                mot_processed_annotations = []
+
             for annot in annot_json_data['annotations']:
                 image_name = \
                     orig_image_id_to_image_name.get(annot['image_id'], None)
@@ -266,10 +308,39 @@ class AbstractCocoGenerator(ABC):
 
                         processed_annotations.append(annotation)
                         annotation_id += 1
+
+                        # MOT: Add the row to the list
+                        # annotation forms each row. frame_id, track_id, x, y, w, h, confidence, category_id, visibility
+                        # frame_id, track_id, x, y, w, h, category id follows coco's value
+                        if mot_for_tracking_eval:
+                            x, y, w, h = annot['bbox']
+                            # @TODO: make sure coco category_id is compatible with MOT's
+                            category_id = self.coco_orig_category_id_to_sorted_order_dict[annot['category_id']]
+                            mot_annotation_frame_id = image_id
+                            mot_annotation_track_id = annot['track_id']+1
+                            mot_processed_annotations.append([mot_annotation_frame_id,
+                                                            mot_annotation_track_id, 
+                                                            x, y, w, h, 
+                                                            1.0, 
+                                                            category_id, 
+                                                            1.0])
                     else:
                         nan_track_id_count += 1
                         print("track id is nan!", nan_track_id_count)
                         print("track id == nan annotation", annot)
+
+            if mot_for_tracking_eval:
+                # generate artificial mot gt from coco
+                seq_path = os.path.join(self.dataset_base_path, seq)
+                mot_path = os.path.join(seq_path, 'gt')
+                mot_txt_path = os.path.join(mot_path, 'gt.txt')
+                if os.path.isdir(mot_path):
+                    import shutil
+                    shutil.rmtree(mot_path)
+                os.makedirs(mot_path)
+                with open(mot_txt_path, 'w', newline='') as f:
+                    writer = csv.writer(f)
+                    writer.writerows(mot_processed_annotations)
 
         return processed_annotations
 
@@ -278,6 +349,13 @@ class AbstractCocoGenerator(ABC):
         pass
 
     def generate(self):
+        """main function generates parsed coco tracking style ground truth json file
+        creates coco directory, 
+        process integrated images list information
+        load gt annotation file data
+        and process annotation
+        creates annotations for each split
+        """
         seqs = self.generate_sequences()
 
         print(self.split_name, seqs)

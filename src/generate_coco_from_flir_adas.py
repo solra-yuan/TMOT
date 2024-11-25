@@ -60,6 +60,16 @@ class CustomDatasetDict(TypedDict):
     '''
         The root directory of the dataset.
     '''
+# Note: MOT format gt for each sequence is needed to tracking evaluation.
+# (although the model uses coco-style input during training)
+# when evaluating The tracking performance of trained model,
+# 3rd party Motmetrics library compares MOT format gt(not coco tracking style) for each sequence
+# to model's inference output.(e.g. one MOT GT file for video-BzZspxAweF8AnKhWK)
+# If don't have MOT GT file, the inference is done without calculating the MOT metrics.
+# But that is not desired when examining the model performance in detail.
+# for check how the inferencing work in detail, examine src/track.py to start tracking 
+# after training the model.
+MOT_FOR_TRACKING_EVAL = True 
 
 DATA_PARSE_LIST = [
     'flir_adas_v2',
