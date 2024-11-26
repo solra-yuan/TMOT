@@ -274,6 +274,8 @@ class AbstractCocoGenerator(ABC):
         for seq in seqs:
             if mot_for_tracking_eval == True:
                 mot_processed_annotations = []
+                mot_seq_current_img_id = 1 # mot has 1-based img id initialized as 1 every sequence
+                previous_img_id = None
 
             for annot in annot_json_data['annotations']:
                 image_name = \
@@ -285,6 +287,7 @@ class AbstractCocoGenerator(ABC):
                 if seq != image_seq:
                     continue
 
+                # coco has sequential img id integrated among all sequences
                 image_id = self.orig_image_name_to_parsed_image_id.get(
                     image_name[5:],
                     None
@@ -316,14 +319,20 @@ class AbstractCocoGenerator(ABC):
                             x, y, w, h = annot['bbox']
                             # @TODO: make sure coco category_id is compatible with MOT's
                             category_id = self.coco_orig_category_id_to_sorted_order_dict[annot['category_id']]
-                            mot_annotation_frame_id = image_id
+
+                            if image_id != previous_img_id and previous_img_id != None:
+                                mot_seq_current_img_id += 1
+                            previous_img_id = image_id
+
+                            mot_annotation_frame_id = mot_seq_current_img_id
                             mot_annotation_track_id = annot['track_id']+1
                             mot_processed_annotations.append([mot_annotation_frame_id,
                                                             mot_annotation_track_id, 
-                                                            x, y, w, h, 
+                                                            x, y, w, h,
                                                             1.0, 
-                                                            category_id, 
+                                                            category_id,
                                                             1.0])
+
                     else:
                         nan_track_id_count += 1
                         print("track id is nan!", nan_track_id_count)
