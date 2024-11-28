@@ -20,10 +20,11 @@ from .coco import CocoDetection, make_coco_transforms
 
 class FLIR_ADAS_V2(CocoDetection):
 
-    def __init__(self, *args, prev_frame_range=1, random_state_dict=None, flir_concat_size_tuple=None, **kwargs):
+    def __init__(self, *args, prev_frame_range=1, random_state_dict=None, flir_concat_size_tuple=None, frame_range=None, **kwargs):
         super(FLIR_ADAS_V2, self).__init__(*args, **kwargs)
 
         self._prev_frame_range = prev_frame_range
+        self._frame_range = frame_range
         if random_state_dict is not None:
             self.random_state_dict = random_state_dict
         else:
@@ -41,10 +42,16 @@ class FLIR_ADAS_V2(CocoDetection):
     def frame_range(self):
         if 'frame_range' in self.coco.dataset:
             return self.coco.dataset['frame_range']
+        elif self._frame_range is not None:
+            return self._frame_range
         else:
             return {'start': 0, 'end': 1.0}
 
     def seq_length(self, idx):
+        if self.frame_range != None:
+            start_frame = int(self.frame_range['start'] * self.coco.imgs[idx]['seq_length'])
+            end_frame = int(self.frame_range['end'] * self.coco.imgs[idx]['seq_length'])
+            return end_frame - start_frame  # Return the length of the selected range
         return self.coco.imgs[idx]['seq_length']
 
     def sample_weight(self, idx):
@@ -144,10 +151,11 @@ class FLIR_ADAS_V2(CocoDetection):
 
 class FLIR_ADAS_V2_thermal(CocoDetection):
 
-    def __init__(self, *args, prev_frame_range=1, random_state_dict=None, flir_concat_size_tuple=None, **kwargs):
+    def __init__(self, *args, prev_frame_range=1, random_state_dict=None, flir_concat_size_tuple=None, frame_range=None, **kwargs):
         super(FLIR_ADAS_V2_thermal, self).__init__(*args, **kwargs)
 
         self._prev_frame_range = prev_frame_range
+        self._frame_range = frame_range
         if random_state_dict is not None:
             self.random_state_dict = random_state_dict
         else:
@@ -166,10 +174,16 @@ class FLIR_ADAS_V2_thermal(CocoDetection):
     def frame_range(self):
         if 'frame_range' in self.coco.dataset:
             return self.coco.dataset['frame_range']
+        elif self._frame_range is not None:
+            return self._frame_range
         else:
             return {'start': 0, 'end': 1.0}
 
     def seq_length(self, idx):
+        if self.frame_range != None:
+            start_frame = int(self.frame_range['start'] * self.coco.imgs[idx]['seq_length'])
+            end_frame = int(self.frame_range['end'] * self.coco.imgs[idx]['seq_length'])
+            return end_frame - start_frame  # Return the length of the selected range        
         return self.coco.imgs[idx]['seq_length']
 
     def sample_weight(self, idx):
@@ -271,12 +285,14 @@ class FLIR_ADAS_V2_concat(CocoDetection):
                  dataset_thermal: FLIR_ADAS_V2_thermal, 
                  prev_frame_range=1, 
                  random_state_dict=None, 
-                 flir_concat_size_tuple=None, 
+                 flir_concat_size_tuple=None,
+                 frame_range=None,
                  **kwargs
                 ):
         super(FLIR_ADAS_V2_concat, self).__init__(*args, **kwargs)
 
         self._prev_frame_range = prev_frame_range
+        self._frame_range = frame_range
         if random_state_dict is not None:
             self.random_state_dict = random_state_dict
         else:
@@ -297,10 +313,16 @@ class FLIR_ADAS_V2_concat(CocoDetection):
     def frame_range(self):
         if 'frame_range' in self.coco.dataset:
             return self.coco.dataset['frame_range']
+        elif self._frame_range != None:
+            return self._frame_range
         else:
             return {'start': 0, 'end': 1.0}
     
     def seq_length(self, idx):
+        if self.frame_range != None:
+            start_frame = int(self.frame_range['start'] * self.coco.imgs[idx]['seq_length'])
+            end_frame = int(self.frame_range['end'] * self.coco.imgs[idx]['seq_length'])
+            return end_frame - start_frame  # Return the length of the selected range
         return self.coco.imgs[idx]['seq_length']
 
     def sample_weight(self, idx):
@@ -520,10 +542,12 @@ def build_flir_adas_v2_concat(image_set, args):
         root = Path(args.flir_adas_v2_path_train)
         prev_frame_rnd_augs = args.track_prev_frame_rnd_augs
         prev_frame_range = args.track_prev_frame_range
+        frame_range = {'start': 0.0, 'end': 0.8}
     elif image_set == 'val':
         root = Path(args.flir_adas_v2_path_val)
         prev_frame_rnd_augs = 0.0
         prev_frame_range = 1
+        frame_range = {'start': 0.8, 'end': 1.0}
     else:
         ValueError(f'unknown {image_set}')
 
@@ -550,12 +574,13 @@ def build_flir_adas_v2_concat(image_set, args):
         prev_frame_range=prev_frame_range,
         random_state_dict = flir_concat_random_state_dict,
         flir_concat_size_tuple = flir_rgb_t_concat_size_tuple,
+        frame_range=frame_range,
         return_masks=args.masks,
         overflow_boxes=args.overflow_boxes,
         remove_no_obj_imgs=False,
         prev_frame=args.tracking,
         prev_frame_rnd_augs=prev_frame_rnd_augs,
-        prev_prev_frame=args.track_prev_prev_frame,
+        prev_prev_frame=args.track_prev_prev_frame
     )
 
     # flir_adas_v2
@@ -569,12 +594,13 @@ def build_flir_adas_v2_concat(image_set, args):
         prev_frame_range=prev_frame_range,
         random_state_dict = flir_concat_random_state_dict,
         flir_concat_size_tuple = flir_rgb_t_concat_size_tuple,
+        frame_range=frame_range,
         return_masks=args.masks,
         overflow_boxes=args.overflow_boxes,
         remove_no_obj_imgs=False,
         prev_frame=args.tracking,
         prev_frame_rnd_augs=prev_frame_rnd_augs,
-        prev_prev_frame=args.track_prev_prev_frame,
+        prev_prev_frame=args.track_prev_prev_frame        
     )
 
     # concat each dataset class
@@ -585,6 +611,7 @@ def build_flir_adas_v2_concat(image_set, args):
         prev_frame_range=prev_frame_range,
         random_state_dict = flir_concat_random_state_dict,
         flir_concat_size_tuple = flir_rgb_t_concat_size_tuple,
+        frame_range=frame_range,
         return_masks=args.masks,
         overflow_boxes=args.overflow_boxes,
         remove_no_obj_imgs=False,
