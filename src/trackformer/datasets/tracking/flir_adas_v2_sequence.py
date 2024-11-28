@@ -59,6 +59,7 @@ class FLIR_ADAS_V2_Sequence(Dataset):
 
             self.data = self._sequence()
             self.no_gt = not osp.exists(self.get_gt_file_path())
+        self.no_gt = False # 죽겠지만 일단 강제입력
             
     def __len__(self) -> int:
         return len(self.data)
