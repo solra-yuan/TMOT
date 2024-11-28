@@ -86,8 +86,8 @@ def main(seed, dataset_name, obj_detect_checkpoint_file, tracker_cfg,
             k.replace('detr.', ''): v
             for k, v in obj_detect_state_dict.items()
             if 'track_encoding' not in k}
-
-        obj_detector.load_state_dict(obj_detect_state_dict)
+        #@TODO: strict=False는 강제입력이므로 나중에 제대로된 모델파일로 교체
+        obj_detector.load_state_dict(obj_detect_state_dict, strict=False) 
         if 'epoch' in obj_detect_checkpoint:
             _log.info(f"INIT object detector [EPOCH: {obj_detect_checkpoint['epoch']}]")
 
