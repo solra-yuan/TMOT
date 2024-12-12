@@ -61,10 +61,25 @@ class MOT17Sequence(Dataset):
             self.no_gt = not osp.exists(self.get_gt_file_path())
 
     def __len__(self) -> int:
+        """
+        Return the total number of frames in the sequence.
+
+        Returns:
+            int: Number of frames in the loaded sequence.
+        """
         return len(self.data)
 
     def __getitem__(self, idx: int) -> dict:
-        """Return the ith image converted to blob"""
+        """
+        Return the ith image converted to blob.
+        Retrieve a single frame of the sequence.
+
+        Args:
+            idx (int): Index of the frame to retrieve.
+
+        Returns:
+            dict: Contains image data, detections, ground truth, and metadata.
+        """
         data = self.data[idx]
         img = Image.open(data['im_path']).convert("RGB")
         width_orig, height_orig = img.size
@@ -84,6 +99,12 @@ class MOT17Sequence(Dataset):
         return sample
 
     def _sequence(self) -> List[dict]:
+        """
+        Load the data for the sequence, including ground truth and detections.
+
+        Returns:
+            list: A list of dictionaries, each containing data for a single frame.
+        """
         # public detections
         dets = {i: [] for i in range(1, self.seq_length + 1)}
         det_file = self.get_det_file_path()
@@ -118,7 +139,14 @@ class MOT17Sequence(Dataset):
         return total
 
     def get_track_boxes_and_visbility(self) -> Tuple[dict, dict]:
-        """ Load ground truth boxes and their visibility."""
+        """
+        Load ground truth bounding boxes and their visibility scores.
+
+        Returns:
+            Tuple[dict, dict]: A tuple containing two dictionaries:
+                - Ground truth bounding boxes.
+                - Visibility scores for each object.
+        """
         boxes = {}
         visibility = {}
 
