@@ -16,7 +16,7 @@ parser = argparse.ArgumentParser(description='Argparse Example')
 parser.add_argument(
     '--path',
     type=str,
-    default=environ.get("DATA_PATH") or './src/coco_parser_custom_copy.json',
+    default=environ.get("DATA_PATH") or './src/coco_parser_custom.json',
     help='Dataset path'
 )
 
