@@ -186,6 +186,13 @@ class AbstractCocoGenerator(ABC):
         Args:
             -coco_dir
             -seqs
+<<<<<<< HEAD
+=======
+<<<<<<< HEAD
+
+=======
+>>>>>>> eeaa5cc (Generate artificial mot)
+>>>>>>> da55553 ([merge] generate artificial mot)
         Returns:
             images(list) : A list contains ground truth data of all video sequences in dataset.
                 iterates the video sequence in alphebet order.
@@ -319,6 +326,7 @@ class AbstractCocoGenerator(ABC):
                             x, y, w, h = annot['bbox']
                             # @TODO: make sure coco category_id is compatible with MOT's
                             category_id = self.coco_orig_category_id_to_sorted_order_dict[annot['category_id']]
+
 
                             if image_id != previous_img_id and previous_img_id != None:
                                 mot_seq_current_img_id += 1
