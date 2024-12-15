@@ -165,6 +165,7 @@ def _resnet_4_channel(
 def resnet50_4_channel(pretrained: bool = False, progress: bool = True, **kwargs: Any) -> ResNet4Channel:
     """
     ResNet-50 아키텍처를 기반으로 한 4채널 입력 모델 생성.
+    `"Deep Residual Learning for Image Recognition" <https://arxiv.org/pdf/1512.03385.pdf>`_
 
     Args:
         pretrained (bool): 사전 학습된 가중치를 사용할지 여부.
