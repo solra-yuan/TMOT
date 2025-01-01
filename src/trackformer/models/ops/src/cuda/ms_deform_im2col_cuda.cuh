@@ -20,56 +20,141 @@ inline int GET_BLOCKS(const int N)
   return (N + CUDA_NUM_THREADS - 1) / CUDA_NUM_THREADS;
 }
 
+/****************************************************************************
+* 함수명  : ms_deform_attn_im2col_bilinear
+* 설명    : 주어진 4차원 텐서(bottom_data)에서 (h, w) 부동소수점 위치에 대해
+*           bilinear 보간을 수행하여 값을 샘플링한다. 
+*
+*           Bilinear 보간(Bilinear Interpolation)은 이미지나 2차원 신호에서,
+*           정규화된 격자(grid) 좌표에 없는 임의의 점에서의 값을 추정하기 위해 
+*           사용하는 보간 방법 중 하나입니다. 
+*           
+*           간단히 말해, 어떤 점 (x,y)가 네 개의 픽셀(또는 격자점) 사이에 위치할 때,
+*           해당 점의 값을 주변 네 픽셀의 값과 거리(가중치)를 바탕으로 "선형(linear)"
+*           형태로 섞어서(합쳐서) 추정하는 방식입니다.
+*
+* 매개변수:
+*   bottom_data [in] - 입력 데이터(4차원 텐서를 1차원으로 펼친 배열)
+*   height      [in] - 텐서의 높이
+*   width       [in] - 텐서의 너비
+*   nheads      [in] - 어텐션 헤드(head)의 수
+*   channels    [in] - 채널 수
+*   h           [in] - 보간할 세로 좌표(부동소수점)
+*   w           [in] - 보간할 가로 좌표(부동소수점)
+*   m           [in] - 현재 사용하는 어텐션 헤드의 인덱스
+*   c           [in] - 현재 채널 인덱스
+*
+* 반환값  :
+*   - bilinear 보간을 통해 계산된 샘플 값.
+*
+* 사용 예 :
+*   - multi-scale deformable attention, deformable DETR, Vision Transformer 등에서
+*     여러 스케일이나 위치에 대해 동적으로 특징 맵을 샘플링할 때 활용 가능.
+*
+****************************************************************************/
 template <typename scalar_t>
-__device__ scalar_t ms_deform_attn_im2col_bilinear(const scalar_t *bottom_data,
-                                                   const int height,
-                                                   const int width,
-                                                   const int nheads,
-                                                   const int channels,
-                                                   scalar_t h,
-                                                   scalar_t w,
-                                                   const int m,
-                                                   const int c)
+__device__ scalar_t ms_deform_attn_im2col_bilinear(
+    const scalar_t* bottom_data,  // 4차원 텐서를 1차원으로 펼친 입력 데이터
+    const int height,             // 텐서의 높이
+    const int width,              // 텐서의 너비
+    const int nheads,             // 어텐션 헤드의 개수
+    const int channels,           // 채널 수
+    scalar_t h,                   // 보간할 y좌표(세로, 부동소수점)
+    scalar_t w,                   // 보간할 x좌표(가로, 부동소수점)
+    const int m,                  // 어텐션 헤드 인덱스
+    const int c                   // 채널 인덱스
+)
 {
-  int h_low = floor(h);
-  int w_low = floor(w);
-  int h_high = h_low + 1;
-  int w_high = w_low + 1;
+    //----------------------------------------------------------------------------------
+    // 1) (h, w)를 기준으로 가장 가까운 정수 좌표(아래쪽: h_low, w_low)와
+    //    그 바로 윗좌표(위쪽: h_high, w_high)를 구한다.
+    //----------------------------------------------------------------------------------
+    int h_low = floor(h);
+    int w_low = floor(w);
+    int h_high = h_low + 1;
+    int w_high = w_low + 1;
 
-  scalar_t lh = h - h_low;
-  scalar_t lw = w - w_low;
-  scalar_t hh = 1 - lh, hw = 1 - lw;
+    //----------------------------------------------------------------------------------
+    // 2) (h, w)의 소수 부분(lh, lw)과 그 보완(hh, hw)을 구한다.
+    //    예) lh = h - floor(h), hh = 1 - lh
+    //----------------------------------------------------------------------------------
+    scalar_t lh = h - h_low;  // 세로 좌표의 소수 부분
+    scalar_t lw = w - w_low;  // 가로 좌표의 소수 부분
+    scalar_t hh = 1 - lh;     // 세로 소수 부분의 보완
+    scalar_t hw = 1 - lw;     // 가로 소수 부분의 보완
 
-  scalar_t v1 = 0;
-  if (h_low >= 0 && w_low >= 0)
-  {
-    int ptr1 = h_low * width * nheads * channels + w_low * nheads * channels + m * channels + c;
-    v1 = bottom_data[ptr1];
-  }
-  scalar_t v2 = 0;
-  if (h_low >= 0 && w_high <= width - 1)
-  {
-    int ptr2 = h_low * width * nheads * channels + w_high * nheads * channels + m * channels + c;
-    v2 = bottom_data[ptr2];
-  }
-  scalar_t v3 = 0;
-  if (h_high <= height - 1 && w_low >= 0)
-  {
-    int ptr3 = h_high * width * nheads * channels + w_low * nheads * channels + m * channels + c;
-    v3 = bottom_data[ptr3];
-  }
-  scalar_t v4 = 0;
-  if (h_high <= height - 1 && w_high <= width - 1)
-  {
-    int ptr4 = h_high * width * nheads * channels + w_high * nheads * channels + m * channels + c;
-    v4 = bottom_data[ptr4];
-  }
+    //----------------------------------------------------------------------------------
+    // 3) bilinear 보간은 네 개의 인접 픽셀(좌상단, 우상단, 좌하단, 우하단) 값을 활용한다.
+    //    각각 v1, v2, v3, v4로 표기한다. 텐서 범위를 벗어나는 경우 0으로 처리한다.
+    //----------------------------------------------------------------------------------
+    scalar_t v1 = 0;  // 좌상단 픽셀 값
+    if (h_low >= 0 && w_low >= 0)
+    {
+        int ptr1 = h_low * width * nheads * channels
+                 + w_low * nheads * channels
+                 + m * channels
+                 + c;
+        v1 = bottom_data[ptr1];
+    }
 
-  scalar_t w1 = hh * hw, w2 = hh * lw, w3 = lh * hw, w4 = lh * lw;
+    scalar_t v2 = 0;  // 우상단 픽셀 값
+    if (h_low >= 0 && w_high <= width - 1)
+    {
+        int ptr2 = h_low * width * nheads * channels
+                 + w_high * nheads * channels
+                 + m * channels
+                 + c;
+        v2 = bottom_data[ptr2];
+    }
 
-  scalar_t val = (w1 * v1 + w2 * v2 + w3 * v3 + w4 * v4);
-  return val;
+    scalar_t v3 = 0;  // 좌하단 픽셀 값
+    if (h_high <= height - 1 && w_low >= 0)
+    {
+        int ptr3 = h_high * width * nheads * channels
+                 + w_low * nheads * channels
+                 + m * channels
+                 + c;
+        v3 = bottom_data[ptr3];
+    }
+
+    scalar_t v4 = 0;  // 우하단 픽셀 값
+    if (h_high <= height - 1 && w_high <= width - 1)
+    {
+        int ptr4 = h_high * width * nheads * channels
+                 + w_high * nheads * channels
+                 + m * channels
+                 + c;
+        v4 = bottom_data[ptr4];
+    }
+
+    //----------------------------------------------------------------------------------
+    // 4) bilinear 보간 가중치 계산
+    //    - w1: 좌상단에 대한 가중치
+    //    - w2: 우상단에 대한 가중치
+    //    - w3: 좌하단에 대한 가중치
+    //    - w4: 우하단에 대한 가중치
+    //
+    //    w1 = hh * hw
+    //    w2 = hh * lw
+    //    w3 = lh * hw
+    //    w4 = lh * lw
+    //----------------------------------------------------------------------------------
+    scalar_t w1 = hh * hw;
+    scalar_t w2 = hh * lw;
+    scalar_t w3 = lh * hw;
+    scalar_t w4 = lh * lw;
+
+    //----------------------------------------------------------------------------------
+    // 5) 최종 보간 값 = (v1*w1 + v2*w2 + v3*w3 + v4*w4)
+    //----------------------------------------------------------------------------------
+    scalar_t val = (w1 * v1 + w2 * v2 + w3 * v3 + w4 * v4);
+
+    //----------------------------------------------------------------------------------
+    // 6) 계산된 결과 반환
+    //----------------------------------------------------------------------------------
+    return val;
 }
+
 
 template <typename scalar_t>
 __device__ scalar_t ms_deform_attn_get_gradient_weight(scalar_t h, scalar_t w,
