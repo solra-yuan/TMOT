@@ -9,10 +9,10 @@
 #include <THC/THCAtomics.cuh>
 // #include <THC/THCDeviceUtils.cuh>
 
-#define CUDA_KERNEL_LOOP(i, n)                          \
-  for (int i = blockIdx.x * blockDim.x + threadIdx.x;   \
-      i < (n);                                          \
-      i += blockDim.x * gridDim.x)
+#define CUDA_KERNEL_LOOP(i, n)                        \
+  for (int i = blockIdx.x * blockDim.x + threadIdx.x; \
+       i < (n);                                       \
+       i += blockDim.x * gridDim.x)
 
 const int CUDA_NUM_THREADS = 1024;
 inline int GET_BLOCKS(const int N)
@@ -20,11 +20,16 @@ inline int GET_BLOCKS(const int N)
   return (N + CUDA_NUM_THREADS - 1) / CUDA_NUM_THREADS;
 }
 
-
 template <typename scalar_t>
-__device__ scalar_t ms_deform_attn_im2col_bilinear(const scalar_t *bottom_data, 
-                                                   const int height, const int width, const int nheads, const int channels, 
-                                                   scalar_t h, scalar_t w, const int m, const int c)
+__device__ scalar_t ms_deform_attn_im2col_bilinear(const scalar_t *bottom_data,
+                                                   const int height,
+                                                   const int width,
+                                                   const int nheads,
+                                                   const int channels,
+                                                   scalar_t h,
+                                                   scalar_t w,
+                                                   const int m,
+                                                   const int c)
 {
   int h_low = floor(h);
   int w_low = floor(w);
@@ -72,7 +77,7 @@ __device__ scalar_t ms_deform_attn_get_gradient_weight(scalar_t h, scalar_t w,
 {
   if (h <= -1 || h >= height || w <= -1 || w >= width)
   {
-    //empty
+    // empty
     return 0;
   }
 
@@ -95,12 +100,12 @@ __device__ scalar_t ms_deform_attn_get_gradient_weight(scalar_t h, scalar_t w,
 
 template <typename scalar_t>
 __device__ scalar_t ms_deform_attn_get_coordinate_weight(scalar_t h, scalar_t w, const int m, const int c,
-                                            const int height, const int width, const int nheads, const int channels, 
-                                            const scalar_t *bottom_data, const int bp_dir)
+                                                         const int height, const int width, const int nheads, const int channels,
+                                                         const scalar_t *bottom_data, const int bp_dir)
 {
   if (h <= -1 || h >= height || w <= -1 || w >= width)
   {
-    //empty
+    // empty
     return 0;
   }
 
@@ -164,15 +169,15 @@ __device__ scalar_t ms_deform_attn_get_coordinate_weight(scalar_t h, scalar_t w,
 
 template <typename scalar_t>
 __global__ void ms_deformable_im2col_gpu_kernel(const int n,
-                                                const scalar_t *data_value, 
+                                                const scalar_t *data_value,
                                                 const int64_t *data_spatial_shapes,
-                                                const int64_t *data_level_start_index, 
+                                                const int64_t *data_level_start_index,
                                                 const scalar_t *data_sampling_loc,
                                                 const scalar_t *data_attn_weight,
-                                                const int batch_size, 
-                                                const int spatial_size, 
+                                                const int batch_size,
+                                                const int spatial_size,
                                                 const int num_heads,
-                                                const int channels, 
+                                                const int channels,
                                                 const int num_levels,
                                                 const int num_query,
                                                 const int num_point,
@@ -216,7 +221,7 @@ __global__ void ms_deformable_im2col_gpu_kernel(const int n,
                                             + q_col * num_heads * num_levels * num_point);
 
     for (int i = 0; i < num_heads; ++i)
-    {      
+    {
       const int data_loc_h_ptr = i * num_levels * num_point * 2 + l_col * num_point * 2 + p_col * 2 + 1;
       const int data_loc_w_ptr = i * num_levels * num_point * 2 + l_col * num_point * 2 + p_col * 2;
       const int data_weight_ptr = i * num_levels * num_point + l_col * num_point + p_col;
@@ -240,13 +245,13 @@ template <typename scalar_t>
 __global__ void ms_deformable_col2im_gpu_kernel(const int n,
                                                 const scalar_t *data_col,
                                                 const int64_t *data_spatial_shapes,
-                                                const int64_t *data_level_start_index, 
+                                                const int64_t *data_level_start_index,
                                                 const scalar_t *data_sampling_loc,
                                                 const scalar_t *data_attn_weight,
-                                                const int batch_size, 
-                                                const int spatial_size, 
+                                                const int batch_size,
+                                                const int spatial_size,
                                                 const int num_heads,
-                                                const int channels, 
+                                                const int channels,
                                                 const int num_levels,
                                                 const int num_query,
                                                 const int num_point,
@@ -269,7 +274,7 @@ __global__ void ms_deformable_col2im_gpu_kernel(const int n,
     const int spatial_h = data_spatial_shapes[l_col * 2];
     const int spatial_w = data_spatial_shapes[l_col * 2 + 1];
 
-    const scalar_t col = data_col[  c_col
+      const scalar_t col = data_col[  c_col
                                   + channels * m_col
                                   + channels * num_heads * q_col
                                   + channels * num_heads * num_query * b_col];
@@ -307,16 +312,16 @@ __global__ void ms_deformable_col2im_gpu_kernel(const int n,
 
 template <typename scalar_t>
 __global__ void ms_deformable_col2im_coord_gpu_kernel(const int n,
-                                                      const scalar_t *data_col,   
-                                                      const scalar_t *data_value, 
+                                                      const scalar_t *data_col,
+                                                      const scalar_t *data_value,
                                                       const int64_t *data_spatial_shapes,
-                                                      const int64_t *data_level_start_index, 
+                                                      const int64_t *data_level_start_index,
                                                       const scalar_t *data_sampling_loc,
                                                       const scalar_t *data_attn_weight,
-                                                      const int batch_size, 
-                                                      const int spatial_size, 
+                                                      const int batch_size,
+                                                      const int spatial_size,
                                                       const int num_heads,
-                                                      const int channels, 
+                                                      const int channels,
                                                       const int num_levels,
                                                       const int num_query,
                                                       const int num_point,
@@ -340,7 +345,7 @@ __global__ void ms_deformable_col2im_coord_gpu_kernel(const int n,
     const int level_start_id = data_level_start_index[l];
     const int spatial_h = data_spatial_shapes[l * 2];
     const int spatial_w = data_spatial_shapes[l * 2 + 1];
-    
+
     const scalar_t *data_col_ptr = data_col 
                                  +( m * channels
                                   + q * channels * num_heads
@@ -366,128 +371,129 @@ __global__ void ms_deformable_col2im_coord_gpu_kernel(const int n,
       }
       const scalar_t weight = ms_deform_attn_get_coordinate_weight(
           sampling_y, sampling_x, m, col_c,
-          spatial_h, spatial_w, num_heads, channels, 
+          spatial_h, spatial_w, num_heads, channels,
           data_value_ptr, loc_c);
       val += weight * col * attn_weight;
     }
-    if (loc_c == 0) val *= spatial_w;
-    else if (loc_c == 1) val *= spatial_h;
+    if (loc_c == 0)
+      val *= spatial_w;
+    else if (loc_c == 1)
+      val *= spatial_h;
     grad_sampling_loc[index] = val;
-    if (loc_c % 2 == 0) grad_attn_weight[index / 2] = wval;
+    if (loc_c % 2 == 0)
+      grad_attn_weight[index / 2] = wval;
   }
 }
 
 template <typename scalar_t>
 void ms_deformable_im2col_cuda(cudaStream_t stream,
-                              const scalar_t* data_value,
-                              const int64_t* data_spatial_shapes, 
-                              const int64_t* data_level_start_index, 
-                              const scalar_t* data_sampling_loc,
-                              const scalar_t* data_attn_weight,
-                              const int batch_size,
-                              const int spatial_size, 
-                              const int num_heads, 
-                              const int channels, 
-                              const int num_levels, 
-                              const int num_query,
-                              const int num_point,
-                              scalar_t* data_col)
+                               const scalar_t *data_value,
+                               const int64_t *data_spatial_shapes,
+                               const int64_t *data_level_start_index,
+                               const scalar_t *data_sampling_loc,
+                               const scalar_t *data_attn_weight,
+                               const int batch_size,
+                               const int spatial_size,
+                               const int num_heads,
+                               const int channels,
+                               const int num_levels,
+                               const int num_query,
+                               const int num_point,
+                               scalar_t *data_col)
 {
   // num_axes should be smaller than block size
   const int num_kernels = batch_size * num_levels * num_query * num_point * channels;
   ms_deformable_im2col_gpu_kernel<scalar_t>
       <<<GET_BLOCKS(num_kernels), CUDA_NUM_THREADS,
-          0, stream>>>(
-      num_kernels, data_value, data_spatial_shapes, data_level_start_index, data_sampling_loc, data_attn_weight, 
-      batch_size, spatial_size, num_heads, channels, num_levels, num_query, num_point, data_col);
-  
+         0, stream>>>(
+          num_kernels, data_value, data_spatial_shapes, data_level_start_index, data_sampling_loc, data_attn_weight,
+          batch_size, spatial_size, num_heads, channels, num_levels, num_query, num_point, data_col);
+
   cudaError_t err = cudaGetLastError();
   if (err != cudaSuccess)
   {
     printf("error in ms_deformable_im2col_cuda: %s\n", cudaGetErrorString(err));
   }
-
 }
 
 template <typename scalar_t>
 void ms_deformable_col2im_cuda(cudaStream_t stream,
-                              const scalar_t* data_col, 
-                              const int64_t *data_spatial_shapes,
-                              const int64_t *data_level_start_index, 
-                              const scalar_t *data_sampling_loc,
-                              const scalar_t *data_attn_weight,
-                              const int batch_size, 
-                              const int spatial_size, 
-                              const int num_heads,
-                              const int channels, 
-                              const int num_levels,
-                              const int num_query,
-                              const int num_point, 
-                              scalar_t* grad_value)
+                               const scalar_t *data_col,
+                               const int64_t *data_spatial_shapes,
+                               const int64_t *data_level_start_index,
+                               const scalar_t *data_sampling_loc,
+                               const scalar_t *data_attn_weight,
+                               const int batch_size,
+                               const int spatial_size,
+                               const int num_heads,
+                               const int channels,
+                               const int num_levels,
+                               const int num_query,
+                               const int num_point,
+                               scalar_t *grad_value)
 {
-  const int num_kernels = batch_size * num_levels * num_query * num_point * num_heads *  channels;
+  const int num_kernels = batch_size * num_levels * num_query * num_point * num_heads * channels;
   ms_deformable_col2im_gpu_kernel<scalar_t>
       <<<GET_BLOCKS(num_kernels), CUDA_NUM_THREADS,
-          0, stream>>>(
-                    num_kernels, 
-                    data_col, 
-                    data_spatial_shapes,
-                    data_level_start_index, 
-                    data_sampling_loc,
-                    data_attn_weight,
-                    batch_size, 
-                    spatial_size, 
-                    num_heads,
-                    channels, 
-                    num_levels,
-                    num_query,
-                    num_point,
-                    grad_value);
+         0, stream>>>(
+          num_kernels,
+          data_col,
+          data_spatial_shapes,
+          data_level_start_index,
+          data_sampling_loc,
+          data_attn_weight,
+          batch_size,
+          spatial_size,
+          num_heads,
+          channels,
+          num_levels,
+          num_query,
+          num_point,
+          grad_value);
   cudaError_t err = cudaGetLastError();
   if (err != cudaSuccess)
   {
     printf("error in ms_deformable_col2im_cuda: %s\n", cudaGetErrorString(err));
   }
-
 }
 
 template <typename scalar_t>
 void ms_deformable_col2im_coord_cuda(cudaStream_t stream,
-                                    const scalar_t* data_col, 
-                                    const scalar_t *data_value, 
-                                    const int64_t *data_spatial_shapes,
-                                    const int64_t *data_level_start_index, 
-                                    const scalar_t *data_sampling_loc,
-                                    const scalar_t *data_attn_weight,
-                                    const int batch_size, 
-                                    const int spatial_size, 
-                                    const int num_heads,
-                                    const int channels, 
-                                    const int num_levels,
-                                    const int num_query,
-                                    const int num_point,
-                                    scalar_t *grad_sampling_loc, scalar_t *grad_attn_weight)
+                                     const scalar_t *data_col,
+                                     const scalar_t *data_value,
+                                     const int64_t *data_spatial_shapes,
+                                     const int64_t *data_level_start_index,
+                                     const scalar_t *data_sampling_loc,
+                                     const scalar_t *data_attn_weight,
+                                     const int batch_size,
+                                     const int spatial_size,
+                                     const int num_heads,
+                                     const int channels,
+                                     const int num_levels,
+                                     const int num_query,
+                                     const int num_point,
+                                     scalar_t *grad_sampling_loc, scalar_t *grad_attn_weight)
 {
   // data_sampling_loc: batch_size, num_query, num_heads, num_levels, num_point, 2
   // data_attn_weight: batch_size, num_query, num_heads, num_levels, num_point
   const int num_kernels = batch_size * num_query * num_heads * num_levels * num_point * 2;
   ms_deformable_col2im_coord_gpu_kernel<scalar_t>
       <<<GET_BLOCKS(num_kernels), CUDA_NUM_THREADS,
-        0, stream>>>(num_kernels, 
-                    data_col,
-                    data_value, 
-                    data_spatial_shapes,
-                    data_level_start_index, 
-                    data_sampling_loc,
-                    data_attn_weight,
-                    batch_size, 
-                    spatial_size, 
-                    num_heads,
-                    channels, 
-                    num_levels,
-                    num_query,
-                    num_point,
-                    grad_sampling_loc, grad_attn_weight);
+         0, stream>>>(num_kernels,
+                      data_col,
+                      data_value,
+                      data_spatial_shapes,
+                      data_level_start_index,
+                      data_sampling_loc,
+                      data_attn_weight,
+                      batch_size,
+                      spatial_size,
+                      num_heads,
+                      channels,
+                      num_levels,
+                      num_query,
+                      num_point,
+                      grad_sampling_loc, grad_attn_weight);
   cudaError_t err = cudaGetLastError();
   if (err != cudaSuccess)
   {
