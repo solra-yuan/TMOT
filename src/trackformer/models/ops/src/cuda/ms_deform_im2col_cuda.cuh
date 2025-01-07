@@ -9,6 +9,13 @@
 #include <THC/THCAtomics.cuh>
 // #include <THC/THCDeviceUtils.cuh>
 
+/**
+ * @brief CUDA에서 grid-stride 루프 형태로 병렬 처리를 단순화하기 위한 매크로.
+ *        i가 0부터 n 전까지 (blockDim.x * gridDim.x) 간격으로 반복.
+ *
+ * @param i [in/out] 반복문에서 사용할 인덱스 변수(스레드 고유값)
+ * @param n [in]     전체 반복 횟수
+ */
 #define CUDA_KERNEL_LOOP(i, n)                        \
   for (int i = blockIdx.x * blockDim.x + threadIdx.x; \
        i < (n);                                       \
@@ -252,78 +259,192 @@ __device__ scalar_t ms_deform_attn_get_coordinate_weight(scalar_t h, scalar_t w,
   return weight;
 }
 
-template <typename scalar_t>
-__global__ void ms_deformable_im2col_gpu_kernel(const int n,
-                                                const scalar_t *data_value,
-                                                const int64_t *data_spatial_shapes,
-                                                const int64_t *data_level_start_index,
-                                                const scalar_t *data_sampling_loc,
-                                                const scalar_t *data_attn_weight,
-                                                const int batch_size,
-                                                const int spatial_size,
-                                                const int num_heads,
-                                                const int channels,
-                                                const int num_levels,
-                                                const int num_query,
-                                                const int num_point,
-                                                scalar_t *data_col)
+/**
+ * @brief 여러 레벨(feature levels)에 걸쳐 정의된 특징 맵(data_value)에서
+ *        주어진 샘플링 좌표(data_sampling_loc)와 어텐션 가중치(data_attn_weight)를 통해
+ *        bilinear 보간 값을 계산하여 data_col에 저장하는 CUDA 커널.
+ *
+ * @tparam scalar_t    실수(부동소수점) 타입 템플릿 파라미터 (예: float, double 등)
+ *
+ * @param n                       [in]  전체 스레드(출력 픽셀) 개수
+ * @param data_value              [in]  입력 특징 맵 
+ *                                     (shape: [batch_size, spatial_size, num_heads, channels])
+ * @param data_spatial_shapes     [in]  각 레벨의 (height, width) 정보
+ *                                     (shape: [num_levels, 2])
+ * @param data_level_start_index  [in]  각 레벨 시작의 spatial 인덱스 (shape: [num_levels])
+ * @param data_sampling_loc       [in]  샘플링 위치 정보 
+ *                                     (shape: [batch_size, num_query, num_heads, 
+ *                                               num_levels, num_point, 2])
+ * @param data_attn_weight        [in]  어텐션 가중치 
+ *                                     (shape: [batch_size, num_query, num_heads, 
+ *                                               num_levels, num_point])
+ * @param batch_size              [in]  배치 크기
+ * @param spatial_size            [in]  전체 공간 픽셀 수(모든 레벨 합)
+ * @param num_heads               [in]  어텐션 헤드의 수
+ * @param channels                [in]  채널 수
+ * @param num_levels              [in]  피처 레벨의 수
+ * @param num_query               [in]  쿼리(토큰)의 수
+ * @param num_point               [in]  각 레벨별 샘플링할 포인트(위치) 수
+ * @param data_col                [out] 계산된 결과를 저장할 배열
+ *                                     (shape: [num_levels * num_point, 
+ *                                              batch_size, num_query, 
+ *                                              num_heads, channels])
+ *
+ * @note  커널 함수이므로 반환값은 없다.
+ *
+ * @details
+ *    다중 스케일 피처맵을 활용하여 역동적인 위치 샘플링 및 가중 합 수행 가능.
+ */
+template <typename scalar_t> __global__ void ms_deformable_im2col_gpu_kernel(
+    const int n,
+    const scalar_t *data_value,
+    const int64_t *data_spatial_shapes,
+    const int64_t *data_level_start_index,
+    const scalar_t *data_sampling_loc,
+    const scalar_t *data_attn_weight,
+    const int batch_size,
+    const int spatial_size,
+    const int num_heads,
+    const int channels,
+    const int num_levels,
+    const int num_query,
+    const int num_point,
+    scalar_t *data_col)
 {
-  // launch batch_size * num_levels * num_query * num_point * channels cores
-  // data_value: batch_size, spatial_size, num_heads, channels
-  // data_sampling_loc: batch_size, num_query, num_heads, num_levels, num_point, 2
-  // data_attn_weight: batch_size, num_query, num_heads, num_levels, num_point
-  // data_col: num_levels*num_point, batch_size, num_query, num_heads, channels
-  CUDA_KERNEL_LOOP(index, n)
-  {
-    // index index of output matrix
-    const int c_col = index % channels;
-    const int p_col = (index / channels) % num_point;
-    const int q_col = (index / channels / num_point) % num_query;
-    const int l_col = (index / channels / num_point / num_query) % num_levels;
-    const int b_col = index / channels / num_point / num_query / num_levels;
-    const int level_start_id = data_level_start_index[l_col];
-    const int spatial_h = data_spatial_shapes[l_col * 2];
-    const int spatial_w = data_spatial_shapes[l_col * 2 + 1];
-
-    // num_heads, channels
-    scalar_t *data_col_ptr = data_col 
-                           + (  c_col 
-                              + channels * 0
-                              + channels * num_heads * q_col
-                              + channels * num_heads * num_query * b_col
-                              + channels * num_heads * num_query * batch_size * p_col
-                              + channels * num_heads * num_query * batch_size * num_point * l_col);
-    // spatial_h, spatial_w, num_heads, channels
-    const scalar_t *data_value_ptr = data_value 
-                                   + (b_col * spatial_size * num_heads * channels + level_start_id * num_heads * channels);  
-    // num_heads, num_levels, num_point, 2
-    const scalar_t *data_sampling_loc_ptr = data_sampling_loc 
-                                          + (  b_col * num_query * num_heads * num_levels * num_point * 2
-                                             + q_col * num_heads * num_levels * num_point * 2);
-    // num_heads, num_levels, num_point
-    const scalar_t *data_attn_weight_ptr = data_attn_weight 
-                                         + (  b_col * num_query * num_heads * num_levels * num_point
-                                            + q_col * num_heads * num_levels * num_point);
-
-    for (int i = 0; i < num_heads; ++i)
+    //---------------------------------------------------------------------------
+    // grid-stride 루프: 각 스레드별로 index(출력 픽셀) 범위를 나눠 담당.
+    // 
+    // launch batch_size * num_levels * num_query * num_point * channels cores
+    // data_value: batch_size, spatial_size, num_heads, channels
+    // data_sampling_loc: batch_size, num_query, num_heads, num_levels, num_point, 2
+    // data_attn_weight: batch_size, num_query, num_heads, num_levels, num_point
+    // data_col: num_levels*num_point, batch_size, num_query, num_heads, channels
+    //---------------------------------------------------------------------------
+    CUDA_KERNEL_LOOP(index, n)
     {
-      const int data_loc_h_ptr = i * num_levels * num_point * 2 + l_col * num_point * 2 + p_col * 2 + 1;
-      const int data_loc_w_ptr = i * num_levels * num_point * 2 + l_col * num_point * 2 + p_col * 2;
-      const int data_weight_ptr = i * num_levels * num_point + l_col * num_point + p_col;
-      const scalar_t loc_h = data_sampling_loc_ptr[data_loc_h_ptr];
-      const scalar_t loc_w = data_sampling_loc_ptr[data_loc_w_ptr];
-      const scalar_t weight = data_attn_weight_ptr[data_weight_ptr];
-      scalar_t val = static_cast<scalar_t>(0);
-      const scalar_t h_im = loc_h * spatial_h - 0.5;
-      const scalar_t w_im = loc_w * spatial_w - 0.5;
-      if (h_im > -1 && w_im > -1 && h_im < spatial_h && w_im < spatial_w)
-      {
-        val = ms_deform_attn_im2col_bilinear(data_value_ptr, spatial_h, spatial_w, num_heads, channels, h_im, w_im, i, c_col);
-      }
-      *data_col_ptr = val * weight;
-      data_col_ptr += channels;
+        //-----------------------------------------------------------------------
+        // index(출력 픽셀)로부터 (b_col, l_col, q_col, p_col, c_col) 추출
+        //   b_col : 배치 인덱스
+        //   l_col : 레벨 인덱스
+        //   q_col : 쿼리 인덱스
+        //   p_col : 포인트 인덱스
+        //   c_col : 채널 인덱스
+        //-----------------------------------------------------------------------
+        const int c_col = index % channels;
+        const int p_col = (index / channels) % num_point;
+        const int q_col = (index / channels / num_point) % num_query;
+        const int l_col = (index / channels / num_point / num_query) % num_levels;
+        const int b_col =  index / channels / num_point / num_query / num_levels;
+
+        //-----------------------------------------------------------------------
+        // 현재 레벨(l_col)에서의 시작 인덱스(level_start_id)와
+        // 해당 레벨 피처맵의 높이(spatial_h), 너비(spatial_w)
+        //-----------------------------------------------------------------------
+        const int level_start_id = data_level_start_index[l_col];
+        const int spatial_h      = data_spatial_shapes[l_col * 2];
+        const int spatial_w      = data_spatial_shapes[l_col * 2 + 1];
+
+        //-----------------------------------------------------------------------
+        // 출력 배열(data_col)에 대한 포인터 계산
+        // data_col:
+        //   [l_col, p_col, b_col, q_col, (head: i), c_col]
+        //-----------------------------------------------------------------------
+        scalar_t *data_col_ptr = data_col
+            + ( c_col
+              + channels * 0  // head = 0부터 시작, 아래 for문에서 head마다 += channels
+              + channels * num_heads * q_col
+              + channels * num_heads * num_query * b_col
+              + channels * num_heads * num_query * batch_size * p_col
+              + channels * num_heads * num_query * batch_size * num_point * l_col );
+
+        //-----------------------------------------------------------------------
+        // 입력 피처맵(data_value)의 접근 포인터
+        //   data_value: [batch_size, spatial_size, num_heads, channels]
+        //-----------------------------------------------------------------------
+        const scalar_t *data_value_ptr = data_value
+            + ( b_col * spatial_size * num_heads * channels
+              + level_start_id * num_heads * channels );
+
+        //-----------------------------------------------------------------------
+        // data_sampling_loc, data_attn_weight 포인터
+        //   (batch, query)에 따라 offset을 맞춰줌
+        //-----------------------------------------------------------------------
+        const scalar_t *data_sampling_loc_ptr = data_sampling_loc
+            + ( b_col * num_query * num_heads * num_levels * num_point * 2
+              + q_col * num_heads * num_levels * num_point * 2 );
+
+        const scalar_t *data_attn_weight_ptr = data_attn_weight
+            + ( b_col * num_query * num_heads * num_levels * num_point
+              + q_col * num_heads * num_levels * num_point );
+
+        //-----------------------------------------------------------------------
+        // i: head 인덱스 (0 ~ num_heads-1)
+        //-----------------------------------------------------------------------
+        for (int i = 0; i < num_heads; ++i)
+        {
+            //-------------------------------------------------------------------
+            // 샘플링 위치 loc_h, loc_w 인덱스
+            //   - data_sampling_loc은 (..., 2) 구조이므로
+            //     w, h 순서 확인이 필요 (현재 코드는 w -> data_loc_w_ptr,
+            //     h -> data_loc_h_ptr 형태)
+            //-------------------------------------------------------------------
+            const int data_loc_h_ptr = i * num_levels * num_point * 2
+                                     + l_col * num_point * 2
+                                     + p_col * 2
+                                     + 1;
+            const int data_loc_w_ptr = i * num_levels * num_point * 2
+                                     + l_col * num_point * 2
+                                     + p_col * 2
+                                     + 0;
+
+            // 어텐션 가중치 인덱스
+            const int data_weight_ptr = i * num_levels * num_point
+                                      + l_col * num_point
+                                      + p_col;
+
+            // loc_h, loc_w: (0~1) 정규화 좌표 -> 실제 픽셀 좌표로 변환
+            const scalar_t loc_h = data_sampling_loc_ptr[data_loc_h_ptr];
+            const scalar_t loc_w = data_sampling_loc_ptr[data_loc_w_ptr];
+
+            // 어텐션 가중치
+            const scalar_t weight = data_attn_weight_ptr[data_weight_ptr];
+
+            // 보간 결과값을 임시 저장할 변수
+            scalar_t val = static_cast<scalar_t>(0);
+
+            //-------------------------------------------------------------------
+            // 실제 이미지 좌표 = (정규화 좌표 * 크기) - 0.5
+            //   - 0.5는 grid 샘플링 기준점 보정을 위한 것
+            //-------------------------------------------------------------------
+            const scalar_t h_im = loc_h * spatial_h - static_cast<scalar_t>(0.5);
+            const scalar_t w_im = loc_w * spatial_w - static_cast<scalar_t>(0.5);
+
+            //-------------------------------------------------------------------
+            // bilinear 보간을 적용할 범위 검사
+            //-------------------------------------------------------------------
+            if (h_im > -1 && w_im > -1 && h_im < spatial_h && w_im < spatial_w)
+            {
+                val = ms_deform_attn_im2col_bilinear(
+                    data_value_ptr,
+                    spatial_h,
+                    spatial_w,
+                    num_heads,
+                    channels,
+                    h_im,
+                    w_im,
+                    i,         // head index
+                    c_col      // channel index
+                );
+            }
+
+            //-------------------------------------------------------------------
+            // 최종 값 = 보간 값(val) × 어텐션 가중치(weight)
+            // data_col_ptr는 head별로 channels만큼 건너뜀
+            //-------------------------------------------------------------------
+            *data_col_ptr = val * weight;
+            data_col_ptr += channels;
+        }
     }
-  }
 }
 
 template <typename scalar_t>
