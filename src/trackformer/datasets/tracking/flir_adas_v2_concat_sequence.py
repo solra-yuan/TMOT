@@ -186,14 +186,13 @@ class FLIR_ADAS_V2_CONCATSequence(Dataset):
         with open(gt_file, "r") as inf:
             reader = csv.reader(inf, delimiter=',')
             for row in reader:
-                # class person, certainity 1 # @TODO: row[7] is class, and now it only accepts 1. extend this to all class @TODO: check if small gt replaces full gt file when generating gt files. @TODO: some of the box has -1 x1 position
+                # class person, certainity 1 # @TODO: row[7] is class, and now it only accepts 1. extend this to all class
                 if int(float(row[6])) == 1 and int(float(row[7])) == 1 and float(row[8]) >= self._vis_threshold:
-                    # Make pixel indexes 0-based, should already be 0-based (or not)
-                    x1 = int(row[2]) - 1
-                    y1 = int(row[3]) - 1
-                    # This -1 accounts for the width (width of 1 x1=x2)
-                    x2 = x1 + int(row[4]) - 1
-                    y2 = y1 + int(row[5]) - 1
+
+                    x1 = int(row[2])
+                    y1 = int(row[3])
+                    x2 = x1 + int(row[4])
+                    y2 = y1 + int(row[5])
                     bbox = np.array([x1, y1, x2, y2], dtype=np.float32)
 
                     frame_id = int(row[0])

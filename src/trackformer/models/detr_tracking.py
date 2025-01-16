@@ -37,6 +37,18 @@ class DETRTrackingBase(nn.Module):
         self._tracking = True
 
     def add_track_queries_to_targets(self, targets, prev_indices, prev_out, add_false_pos=True):
+        '''
+        inputs
+            -targets: 현재 샘플 배치의 각 타겟 변수가 담긴 리스트 
+            -prev_indices: prev_output_without_aux(prev_out에서 aux 부분 제외)과 
+            prev_targets를 Matcher에 입력 후 리턴받은 값, 
+            Matcher는 prev image로부터 나온 예측값을 prev_target과 Hungarian matching수행함
+            return되는 indice는 예측값에서의 sorted된 인덱스(row idx)와 타겟값에서의 최소비용매칭 인덱스 (col idx)
+            배치 단위로 입력 및 리턴 받음.
+            -prev_out: 현재 타겟의 "prev_image"를 DETR model로 설정된 모델 클래스의 forward 함수에 입력 후,
+            리턴값 중 첫 번째 인자
+            -add_false_pos: optional, false positive 샘플 생성여부
+        '''
         device = prev_out['pred_boxes'].device
 
         # for i, (target, prev_ind) in enumerate(zip(targets, prev_indices)):
@@ -217,8 +229,8 @@ class DETRTrackingBase(nn.Module):
         #     target['track_queries_placeholder_mask'][:num_add] = True
 
     def forward(self, samples: NestedTensor, targets: list = None, prev_features=None):
-        if targets is not None and not self._tracking:
-            prev_targets = [target['prev_target'] for target in targets]
+        if targets is not None and not self._tracking: # 우측: _tracking이 아닐 때만 # @TODO: 이전프레임이 현재프레임과 동일한 경우 발생하는 것 해결
+            prev_targets = [target['prev_target'] for target in targets] # target['prev_target']: 데이터 
 
             # if self.training and random.uniform(0, 1) < 0.5:
             if self.training:
@@ -259,6 +271,7 @@ class DETRTrackingBase(nn.Module):
                     prev_indices = self._matcher(prev_outputs_without_aux, prev_targets)
 
                     self.add_track_queries_to_targets(targets, prev_indices, prev_out)
+
             else:
                 # if not training we do not add track queries and evaluate detection performance only.
                 # tracking performance is evaluated by the actual tracking evaluation.
