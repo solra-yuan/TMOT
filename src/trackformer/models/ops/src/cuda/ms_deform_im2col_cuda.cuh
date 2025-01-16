@@ -165,25 +165,74 @@ __device__ scalar_t ms_deform_attn_im2col_bilinear(
 
 /**
  * @brief Deformable Attention의 역전파 단계에서 그라디언트 가중치를 계산하는 함수.
- *        주어진 좌표(h, w)와 그리드 위치(gh, gw)에 따라 bilinear 보간을 기반으로
- *        가중치를 계산하여 반환한다.
+ *        주어진 실수 좌표(h, w)와 그리드 위치(gh, gw)에 따라 bilinear 보간을 기반으로
+ *        가중치를 계산하여 반환합니다.
  *
- * @tparam scalar_t    실수(부동소수점) 타입 템플릿 파라미터 (예: float, double 등)
+ * @tparam scalar_t    부동소수점 타입 템플릿 파라미터 (예: float, double)
  *
- * @param h            [in]  샘플링된 y좌표 (부동소수점)
- * @param w            [in]  샘플링된 x좌표 (부동소수점)
- * @param gh           [in]  그리드의 y좌표 인덱스 (정수)
- * @param gw           [in]  그리드의 x좌표 인덱스 (정수)
- * @param height       [in]  피처 맵의 높이
- * @param width        [in]  피처 맵의 너비
+ * @param h            [in] 샘플링된 y 좌표 (실수 값)
+ * @param w            [in] 샘플링된 x 좌표 (실수 값)
+ * @param gh           [in] 그리드의 y 좌표 인덱스 (정수)
+ * @param gw           [in] 그리드의 x 좌표 인덱스 (정수)
+ * @param height       [in] 피처 맵의 높이 (정수)
+ * @param width        [in] 피처 맵의 너비 (정수)
  *
- * @return             bilinear 보간을 통한 그라디언트 가중치
+ * @return             Bilinear 보간을 통해 계산된 그라디언트 가중치 (실수 값)
  *
  * @details
- *  - 입력 좌표(h, w)가 피처 맵의 범위를 벗어나는 경우, 가중치는 0으로 설정된다.
- *  - 좌표(h, w)의 주변 4개의 픽셀(좌상단, 우상단, 좌하단, 우하단)에 대한 가중치를 계산한다.
- *  - 그리드 위치(gh, gw)가 해당 픽셀 중 하나에 해당하면, 해당 가중치를 반환한다.
- *  - Deformable Attention의 역전파에서 각 위치의 기여도를 계산하는 데 사용된다.
+ *  이 함수는 주어진 실수 좌표 (h, w)와 그리드 인덱스 (gh, gw) 간의 관계를 바탕으로
+ *  bilinear 보간을 사용하여 그라디언트 가중치를 계산합니다.
+ *
+ *  Bilinear 보간은 실수 좌표를 네 개의 인접한 정수 좌표로 분해하고, 각 좌표에 대한 가중치를
+ *  계산하여 최종 값을 얻는 방식입니다. 이 과정은 다음과 같이 이루어집니다:
+ *
+ *  1. **유효성 검사**:
+ *     - 입력 좌표 (h, w)가 피처 맵의 유효 범위 내에 있는지 확인합니다.
+ *     - 유효 범위를 벗어나면 가중치는 0으로 설정됩니다.
+ *
+ *  2. **인접 정수 좌표 계산**:
+ *     - 실수 좌표 (h, w)를 기반으로 하위 좌표 (h_low, w_low)를 계산합니다.
+ *       여기서 h_low = floor(h), w_low = floor(w) 입니다.
+ *     - 상위 좌표 (h_high, w_high)는 각각 h_low + 1, w_low + 1 로 설정됩니다.
+ *
+ *  3. **가중치 계산**:
+ *     - 주어진 그리드 위치 (gh, gw)가 네 개의 인접 정수 좌표 중 어느 하나와 일치하는지 확인합니다.
+ *     - 일치하는 경우, 해당 위치에 대한 가중치를 다음과 같이 계산합니다:
+ *       - (gh, gw) == (h_low, w_low):
+ *           weight = (h_high - h) * (w_high - w)
+ *       - (gh, gw) == (h_low, w_high):
+ *           weight = (h_high - h) * (w - w_low)
+ *       - (gh, gw) == (h_high, w_low):
+ *           weight = (h - h_low) * (w_high - w)
+ *       - (gh, gw) == (h_high, w_high):
+ *           weight = (h - h_low) * (w - w_low)
+ *     - 해당하지 않으면 가중치는 0으로 유지됩니다.
+ *
+ *  4. **가중치 반환**:
+ *     - 계산된 가중치를 반환합니다. 이 가중치는 Deformable Attention의 역전파 단계에서
+ *       각 그리드 위치의 기여도를 반영하는 데 사용됩니다.
+ *
+ *  @example
+ *  예를 들어:
+ *     - 샘플링된 좌표: h = 2.3, w = 1.8
+ *     - 그리드 위치: gh = 2, gw = 1
+ *     - 피처 맵 크기: height = 4, width = 4
+ * 
+ *  1. 주변 정수 좌표 계산:
+ *     - h_low = floor(2.3) = 2
+ *     - w_low = floor(1.8) = 1
+ *     - h_high = h_low + 1 = 3
+ *     - w_high = w_low + 1 = 2
+ * 
+ *  2. 그리드 위치 (2,1)은 (h_low, w_low)와 일치.
+ * 
+ *  3. 좌상단 가중치 계산:
+ *     - weight = (h_high - h) * (w_high - w)
+ *     -       = (3 - 2.3) * (2 - 1.8)
+ *     -       = 0.7 * 0.2
+ *     -       = 0.14
+ * 
+ *  4. 따라서, 이 경우 가중치는 0.14가 됩니다.
  */
 template <typename scalar_t>
 __device__ scalar_t ms_deform_attn_get_gradient_weight(
@@ -195,15 +244,15 @@ __device__ scalar_t ms_deform_attn_get_gradient_weight(
     const int width
 ) {
     //--------------------------------------------------------------------------
-    // 입력 좌표(h, w)가 피처 맵의 유효 범위를 벗어나는 경우, 가중치는 0
+    // 좌표(h, w)가 피처 맵의 유효 범위를 벗어나는지 확인
     //--------------------------------------------------------------------------
     if (h <= -1 || h >= height || w <= -1 || w >= width)
     {
-        return static_cast<scalar_t>(0);
+        return 0;
     }
 
     //--------------------------------------------------------------------------
-    // 좌표(h, w)를 기준으로 주변 정수 좌표(h_low, w_low)와 그 상위 좌표(h_high, w_high)를 계산
+    // 좌표(h, w)를 기준으로 하위 및 상위 정수 좌표 계산
     //--------------------------------------------------------------------------
     int h_low = floor(h);
     int w_low = floor(w);
@@ -211,12 +260,12 @@ __device__ scalar_t ms_deform_attn_get_gradient_weight(
     int w_high = w_low + 1;
 
     //--------------------------------------------------------------------------
-    // 초기 가중치(weight)를 0으로 설정
+    // 가중치를 초기화
     //--------------------------------------------------------------------------
     scalar_t weight = 0;
 
     //--------------------------------------------------------------------------
-    // 각 그리드 위치(gh, gw)에 따라 가중치를 계산
+    // 각 주변 정수 좌표와 그리드 위치(gh, gw)가 일치할 경우 가중치 계산
     //--------------------------------------------------------------------------
     if (gh == h_low && gw == w_low)
         weight = (gh + 1 - h) * (gw + 1 - w);
@@ -531,14 +580,14 @@ template <typename scalar_t> __global__ void ms_deformable_im2col_gpu_kernel(
             const scalar_t weight = data_attn_weight_ptr[data_weight_ptr];
 
             // 보간 결과값을 임시 저장할 변수
-            scalar_t val = static_cast<scalar_t>(0);
+            scalar_t val = 0;
 
             //-------------------------------------------------------------------
             // 실제 이미지 좌표 = (정규화 좌표 * 크기) - 0.5
             //   - 0.5는 grid 샘플링 기준점 보정을 위한 것
             //-------------------------------------------------------------------
-            const scalar_t h_im = loc_h * spatial_h - static_cast<scalar_t>(0.5);
-            const scalar_t w_im = loc_w * spatial_w - static_cast<scalar_t>(0.5);
+            const scalar_t h_im = loc_h * spatial_h - 0.5;
+            const scalar_t w_im = loc_w * spatial_w - 0.5;
 
             //-------------------------------------------------------------------
             // bilinear 보간을 적용할 범위 검사
