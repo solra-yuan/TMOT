@@ -616,50 +616,53 @@ template <typename scalar_t> __global__ void ms_deformable_im2col_gpu_kernel(
         }
     }
 }
+
 /******************************************************************************
- * @brief 여러 레벨(feature levels)에 걸쳐 정의된 특징 맵(data_value)에서
- *        샘플링된 위치(data_sampling_loc)와 어텐션 가중치(data_attn_weight)를
- *        사용하여 그라디언트 값을 계산하고, 이를 grad_value에 누적하는 CUDA 커널.
- *        주로 Deformable DETR, Multi-Scale Deformable Attention 등에서 사용됨.
+ * @brief
+ *  Multi-Scale Deformable Attention의 역전파(Backward) 단계에서
+ *  여러 레벨(feature levels)에 걸쳐 정의된 특징 맵(data_value)으로
+ *  그라디언트 값을 분배하기 위해 사용되는 CUDA 커널입니다.
+ *  (예: Deformable DETR, Multi-Scale Deformable Attention 등)
  *
  * @tparam scalar_t    실수(부동소수점) 타입 템플릿 파라미터 (예: float, double 등)
  *
  * @param n                       [in]  전체 스레드(출력 픽셀) 개수
- * @param data_col                [in]  입력 데이터 컬럼 
- *                                     (shape: [batch_size, num_query, num_heads, channels])
+ * @param data_col                [in]  Forward 결과(각 쿼리/헤드/채널에 해당하는) Feature값
+ *                                     - shape: [batch_size, num_query, num_heads, channels]
  * @param data_spatial_shapes     [in]  각 레벨의 (height, width) 정보
- *                                     (shape: [num_levels, 2])
- * @param data_level_start_index  [in]  각 레벨 시작의 spatial 인덱스 (shape: [num_levels])
- * @param data_sampling_loc       [in]  샘플링 위치 정보 
- *                                     (shape: [batch_size, num_query, num_heads, 
- *                                             num_levels, num_point, 2])
- * @param data_attn_weight        [in]  어텐션 가중치 
- *                                     (shape: [batch_size, num_query, num_heads, 
- *                                             num_levels, num_point])
+ *                                     - shape: [num_levels, 2]
+ * @param data_level_start_index  [in]  레벨별 시작 인덱스 (모든 레벨을 하나의 큰 Feature 맵으로 봤을 때)
+ *                                     - shape: [num_levels]
+ * @param data_sampling_loc       [in]  샘플링 위치 정보 (Normalized 좌표)
+ *                                     - shape: [batch_size, num_query, num_heads,
+ *                                               num_levels, num_point, 2]
+ * @param data_attn_weight        [in]  어텐션 가중치
+ *                                     - shape: [batch_size, num_query, num_heads,
+ *                                               num_levels, num_point]
  * @param batch_size              [in]  배치 크기
  * @param spatial_size            [in]  전체 공간 픽셀 수(모든 레벨 합)
  * @param num_heads               [in]  어텐션 헤드의 수
  * @param channels                [in]  채널 수
- * @param num_levels              [in]  피처 레벨의 수
- * @param num_query               [in]  쿼리(토큰)의 수
- * @param num_point               [in]  각 레벨별 샘플링할 포인트(위치) 수
- * @param grad_value              [out] 계산된 그라디언트 값을 저장할 배열
- *                                     (shape: [batch_size, spatial_size, num_heads, channels])
- *
- * @return                      없음 (커널 함수이므로 반환값 없음)
+ * @param num_levels              [in]  피처 레벨 수
+ * @param num_query               [in]  쿼리(토큰) 수
+ * @param num_point               [in]  각 레벨에서 샘플링할 포인트 수
+ * @param grad_value              [out] 계산된 그라디언트를 누적할 배열
+ *                                     - shape: [batch_size, spatial_size, num_heads, channels]
  *
  * @details
- *  - 이 커널은 forward pass에서 계산된 data_col과 샘플링 위치, 어텐션 가중치를
- *    사용하여 backward pass에서의 그라디언트를 계산하고, 이를 grad_value에 누적한다.
- *  - 각 스레드는 고유한 인덱스를 기반으로 data_col의 특정 위치를 처리하며,
- *    해당 위치의 그라디언트를 주변의 grad_value 위치에 bilinear 보간 가중치와 함께
- *    누적한다.
- *  - bilinear 보간을 사용하여 그라디언트가 주변 픽셀에 올바르게 분배되도록 한다.
+ *  1) Forward 시점에서, 각 (batch, query, head, channel)에 대해
+ *     data_col이 계산되어 있음.
+ *  2) data_sampling_loc과 data_attn_weight는 
+ *     샘플링 위치(정규화 좌표) 및 어텐션 가중치를 나타냄.
+ *  3) 본 커널은 위 정보들을 이용하여, Bilinear 보간을 통해
+ *     grad_value(= Feature 맵 상 그라디언트)에 역전파 값을 적절히 분배합니다.
+ *  4) atomicAdd를 사용하여, 다수의 스레드가 동일한 grad_value 주소에
+ *     동시에 접근하더라도 올바르게 그라디언트를 더하도록 보장합니다.
  *
  * @note
- *  - 이 커널은 Deformable Attention의 역전파 단계에서 사용되며, 
- *    각 샘플링 위치에 대한 그라디언트를 정확하게 계산하고 누적하는 데 필수적이다.
- *  - atomicAdd를 사용하여 여러 스레드가 동일한 grad_value 위치에 접근할 때의 동시성을 처리한다.
+ *  - 수식 표기는 주석 내부에 포함되어 있으며, 
+ *    (b, l, q, p, m, c) <-> 1차원 index 사이의 매핑 방식과 
+ *    bilinear 보간 가중치 계산 과정을 간단히 명시합니다.
  ******************************************************************************/
 template <typename scalar_t>
 __global__ void ms_deformable_col2im_gpu_kernel(
@@ -678,39 +681,40 @@ __global__ void ms_deformable_col2im_gpu_kernel(
     const int num_point,
     scalar_t *grad_value)
 {
-    //---------------------------------------------------------------------------
-    // grid-stride 루프: 각 스레드별로 index(출력 픽셀) 범위를 나눠 담당.
-    //---------------------------------------------------------------------------
+    //--------------------------------------------------------------------------
+    // (A) grid-stride 루프: 각 스레드는 1차원 index를 바탕으로 담당 범위를 순회
+    //--------------------------------------------------------------------------
     CUDA_KERNEL_LOOP(index, n)
     {
-        //-----------------------------------------------------------------------
-        // index(출력 픽셀)로부터 (b_col, l_col, q_col, p_col, m_col, c_col) 추출
-        //   b_col : 배치 인덱스
-        //   l_col : 레벨 인덱스
-        //   q_col : 쿼리 인덱스
-        //   p_col : 포인트 인덱스
-        //   m_col : 헤드 인덱스
-        //   c_col : 채널 인덱스
-        //-----------------------------------------------------------------------
+        /**************************************************************************
+         * (1) 1차원 index -> 6차원 (b, l, q, p, m, c) 인덱스로 변환
+         *  -------------------------------------------------------------
+         *    c = index % channels
+         *    m = (index / channels) % num_heads
+         *    p = (index / (channels * num_heads)) % num_point
+         *    q = (index / (channels * num_heads * num_point)) % num_query
+         *    l = (index / (channels * num_heads * num_point * num_query)) % num_levels
+         *    b =  index / (channels * num_heads * num_point * num_query * num_levels)
+         **************************************************************************/
         const int c_col = index % channels;
         const int m_col = (index / channels) % num_heads;
-        const int p_col = (index / channels / num_heads) % num_point;
-        const int q_col = (index / channels / num_heads / num_point) % num_query;
-        const int l_col = (index / channels / num_heads / num_point / num_query) % num_levels;
-        const int b_col = index / channels / num_heads / num_point / num_query / num_levels;
+        const int p_col = (index / (channels * num_heads)) % num_point;
+        const int q_col = (index / (channels * num_heads * num_point)) % num_query;
+        const int l_col = (index / (channels * num_heads * num_point * num_query)) % num_levels;
+        const int b_col =  index / (channels * num_heads * num_point * num_query * num_levels);
 
-        //-----------------------------------------------------------------------
-        // 현재 레벨(l_col)에서의 시작 인덱스(level_start_id)와
-        // 해당 레벨 피처맵의 높이(spatial_h), 너비(spatial_w) 구하기
-        //-----------------------------------------------------------------------
+        /**************************************************************************
+         * (2) 레벨(l_col)별 시작 인덱스 및 (spatial_h, spatial_w) 추출
+         **************************************************************************/
         const int level_start_id = data_level_start_index[l_col];
-        const int spatial_h = data_spatial_shapes[l_col * 2];
-        const int spatial_w = data_spatial_shapes[l_col * 2 + 1];
+        const int spatial_h = data_spatial_shapes[l_col * 2];       // 레벨 l_col의 height
+        const int spatial_w = data_spatial_shapes[l_col * 2 + 1];   // 레벨 l_col의 width
 
-        //-----------------------------------------------------------------------
-        // data_col에서 현재 위치(c_col, m_col, q_col, b_col)를 기반으로 값 가져오기
-        // data_col 구조: [batch_size, num_query, num_heads, channels]
-        //-----------------------------------------------------------------------
+        /**************************************************************************
+         * (3) data_col에서 Forward 시점의 Feature 값(col)을 읽음
+         *     - data_col shape: [batch_size, num_query, num_heads, channels]
+         *     - 예시 수식: col = data_col[b, q, m, c]
+         **************************************************************************/
         const scalar_t col = data_col[
             c_col
             + channels * m_col
@@ -718,76 +722,81 @@ __global__ void ms_deformable_col2im_gpu_kernel(
             + channels * num_heads * num_query * b_col
         ];
 
-        //-----------------------------------------------------------------------
-        // 샘플링 위치 및 어텐션 가중치 인덱스 계산
-        // data_sampling_loc: [batch_size, num_query, num_heads, num_levels, num_point, 2]
-        // data_attn_weight: [batch_size, num_query, num_heads, num_levels, num_point]
-        //-----------------------------------------------------------------------
+        /**************************************************************************
+         * (4) 샘플링 위치 (sampling_x, sampling_y) 및 어텐션 가중치(attn_weight) 가져오기
+         *     - data_sampling_loc shape: 
+         *         [batch_size, num_query, num_heads, num_levels, num_point, 2]
+         *     - data_attn_weight shape:
+         *         [batch_size, num_query, num_heads, num_levels, num_point]
+         **************************************************************************/
         int sampling_ptr = b_col * num_query * num_heads * num_levels * num_point
                         + q_col * num_heads * num_levels * num_point
                         + m_col * num_levels * num_point
                         + l_col * num_point
                         + p_col;
-        const scalar_t sampling_x = data_sampling_loc[2 * sampling_ptr] * spatial_w - 0.5;
+        const scalar_t sampling_x = data_sampling_loc[2 * sampling_ptr]     * spatial_w - 0.5;
         const scalar_t sampling_y = data_sampling_loc[2 * sampling_ptr + 1] * spatial_h - 0.5;
         const scalar_t attn_weight = data_attn_weight[sampling_ptr];
 
-        //-----------------------------------------------------------------------
-        // 현재 그라디언트 값 계산
-        // col은 forward pass에서의 값이며, 이를 어텐션 가중치와 곱하여 역전파 그라디언트를 계산
-        //-----------------------------------------------------------------------
+        /**************************************************************************
+         * (5) 역전파될 그라디언트(cur_top_grad) 계산
+         *    - Forward에서 col에 attn_weight가 곱해져 나온 결과가 역전파됨
+         *    - 수식 예: cur_top_grad = col * attn_weight
+         **************************************************************************/
         const scalar_t cur_top_grad = col * attn_weight;
 
-        //-----------------------------------------------------------------------
-        // 샘플링 위치의 정수 부분 추출
-        // (정수 부분을 기반으로 주변 픽셀에 그라디언트를 분배)
-        //-----------------------------------------------------------------------
+        /**************************************************************************
+         * (6) 샘플링된 좌표의 정수 부분 (cur_w, cur_h)을 구하고
+         *     주변 픽셀만 탐색(보간 범위 |diff| < 1)
+         **************************************************************************/
         const int cur_h = (int)sampling_y;
         const int cur_w = (int)sampling_x;
 
-        //-----------------------------------------------------------------------
-        // 주변 픽셀에 대한 그라디언트 가중치 계산 및 누적
-        // bilinear 보간의 역전파 단계
-        //-----------------------------------------------------------------------
+        //--------------------------------------------------------------------------
+        // (7) Bilinear 보간 가중치(weight) 계산 후, grad_value에 누적
+        //--------------------------------------------------------------------------
         for (int dy = -2; dy <= 2; dy++)
         {
             for (int dx = -2; dx <= 2; dx++)
             {
-                //-------------------------------------------------------------------
-                // (cur_h + dy, cur_w + dx)가 유효한 위치인지 확인
-                // 그리고 bilinear 보간의 범위 내에 있는지 확인
-                //-------------------------------------------------------------------
-                if (cur_h + dy >= 0 && cur_h + dy < spatial_h &&
-                    cur_w + dx >= 0 && cur_w + dx < spatial_w &&
-                    abs(sampling_y - (cur_h + dy)) < 1 &&
-                    abs(sampling_x - (cur_w + dx)) < 1)
+                // 유효 범위 내 && bilinear 범위(|diff| < 1) 내인지 판단
+                if ((cur_h + dy) >= 0 && (cur_h + dy) < spatial_h &&
+                    (cur_w + dx) >= 0 && (cur_w + dx) < spatial_w &&
+                    fabsf(sampling_y - (cur_h + dy)) < 1 &&
+                    fabsf(sampling_x - (cur_w + dx)) < 1)
                 {
-                    //-------------------------------------------------------------------
-                    // grad_value에서의 현재 위치 계산
-                    // grad_value 구조: [batch_size, spatial_size, num_heads, channels]
-                    //-------------------------------------------------------------------
-                    int cur_bottom_grad_pos = b_col * spatial_size * num_heads * channels
-                                            + (level_start_id + (cur_h + dy) * spatial_w + (cur_w + dx)) * num_heads * channels
-                                            + m_col * channels
-                                            + c_col;
+                    /*****************************************************************
+                     * (7-A) grad_value에서 (b, h, w, m, c)에 해당하는 메모리 위치
+                     *       - grad_value shape:
+                     *         [batch_size, spatial_size, num_heads, channels]
+                     *       - spatial 인덱스:
+                     *         level_start_id + (cur_h+dy)*spatial_w + (cur_w+dx)
+                     *****************************************************************/
+                    int cur_bottom_grad_pos =
+                        b_col * (spatial_size * num_heads * channels)
+                        + (level_start_id + (cur_h + dy) * spatial_w + (cur_w + dx)) * (num_heads * channels)
+                        + m_col * channels
+                        + c_col;
 
-                    //-------------------------------------------------------------------
-                    // 그라디언트 가중치 계산
-                    // ms_deform_attn_get_gradient_weight 함수 사용
-                    //-------------------------------------------------------------------
+                    /*****************************************************************
+                     * (7-B) Bilinear 보간 가중치(weight) 계산
+                     *       예) weight =
+                     *           (1 - |sampling_y - (cur_h+dy)|) *
+                     *           (1 - |sampling_x - (cur_w+dx)|), 단, 양수만 취함
+                     *****************************************************************/
                     scalar_t weight = ms_deform_attn_get_gradient_weight(
                         sampling_y,
                         sampling_x,
-                        cur_h + dy,
-                        cur_w + dx,
+                        (cur_h + dy),
+                        (cur_w + dx),
                         spatial_h,
                         spatial_w
                     );
 
-                    //-------------------------------------------------------------------
-                    // grad_value에 그라디언트 가중치 * 현재 그라디언트 값을 atomicAdd로 누적
-                    // 여러 스레드가 동일 위치에 접근할 수 있으므로 atomicAdd 사용
-                    //-------------------------------------------------------------------
+                    /*****************************************************************
+                     * (7-C) grad_value에 (weight * cur_top_grad)를 atomicAdd로 누적
+                     *       - 다중 스레드 환경에서 동시에 접근 가능하므로 원자적(atomic) 연산 필요
+                     *****************************************************************/
                     atomicAdd(grad_value + cur_bottom_grad_pos, weight * cur_top_grad);
                 }
             }
