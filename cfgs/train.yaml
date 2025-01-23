@@ -119,7 +119,7 @@ resume_optim: false
 resume_vis: false
 start_epoch: 1
 eval_only: false
-eval_train: false
+eval_train: true
 num_workers: 1
 val_interval: 5
 debug: false

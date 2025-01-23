@@ -394,7 +394,7 @@ def display_images(axarr, img_groups, img_ids):
         ax2.imshow(img_group[1].squeeze(), cmap='gray')
         ax2.set_axis_off()  # 축 제거
 
-        draw_text(ax1, 0, 0, f'IMG_ID={img_id}')
+        draw_text(ax1, 0, 20, f'IMG_ID={img_id}')
 
         axs.append(ax1)
         axs.append(ax2)
