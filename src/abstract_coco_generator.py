@@ -186,13 +186,6 @@ class AbstractCocoGenerator(ABC):
         Args:
             -coco_dir
             -seqs
-<<<<<<< HEAD
-=======
-<<<<<<< HEAD
-
-=======
->>>>>>> eeaa5cc (Generate artificial mot)
->>>>>>> da55553 ([merge] generate artificial mot)
         Returns:
             images(list) : A list contains ground truth data of all video sequences in dataset.
                 iterates the video sequence in alphebet order.
