@@ -2,7 +2,7 @@ from abc import ABC, abstractmethod
 from typing import List, Dict, Optional, TypedDict
 import os
 import json
-
+import csv
 
 def load_sequence_config(config_file_path):
     from configparser import ConfigParser
@@ -79,6 +79,7 @@ class AbstractCocoGenerator(ABC):
         save_root: str,
         gt_file_name: str,
         dataset_base_path: Optional[str] = None,
+        mot_for_tracking_eval = True
     ):
         self.split_name = split_name
         self.seqs_names = seqs_names
@@ -105,6 +106,7 @@ class AbstractCocoGenerator(ABC):
         }
 
         self.orig_image_name_to_parsed_image_id = {}
+        self.mot_for_tracking_eval = mot_for_tracking_eval
 
     def __create_coco_directories(self):
         """create directories 
@@ -120,7 +122,7 @@ class AbstractCocoGenerator(ABC):
         coco_dir = os.path.join(self.save_root, self.split_name)
         if os.path.isdir(coco_dir):
             shutil.rmtree(coco_dir)
-        os.mkdir(coco_dir)
+        os.makedirs(coco_dir)
 
         annotations_dir = os.path.join(self.save_root, 'annotations')
         if not os.path.isdir(annotations_dir):
@@ -184,7 +186,6 @@ class AbstractCocoGenerator(ABC):
         Args:
             -coco_dir
             -seqs
-
         Returns:
             images(list) : A list contains ground truth data of all video sequences in dataset.
                 iterates the video sequence in alphebet order.
@@ -268,8 +269,14 @@ class AbstractCocoGenerator(ABC):
             for img_dict
             in annot_json_data['images']
         }
-
+        mot_for_tracking_eval = self.mot_for_tracking_eval
+        print("mot_for_tracking_eval == {mot_for_tracking_eval}")
         for seq in seqs:
+            if mot_for_tracking_eval == True:
+                mot_processed_annotations = []
+                mot_seq_current_img_id = 1 # mot has 1-based img id initialized as 1 every sequence
+                previous_img_id = None
+
             for annot in annot_json_data['annotations']:
                 image_name = \
                     orig_image_id_to_image_name.get(annot['image_id'], None)
@@ -280,6 +287,7 @@ class AbstractCocoGenerator(ABC):
                 if seq != image_seq:
                     continue
 
+                # coco has sequential img id integrated among all sequences
                 image_id = self.orig_image_name_to_parsed_image_id.get(
                     image_name[5:],
                     None
@@ -303,10 +311,46 @@ class AbstractCocoGenerator(ABC):
 
                         processed_annotations.append(annotation)
                         annotation_id += 1
+
+                        # MOT: Add the row to the list
+                        # annotation forms each row. frame_id, track_id, x, y, w, h, confidence, category_id, visibility
+                        # frame_id, track_id, x, y, w, h, category id follows coco's value
+                        if mot_for_tracking_eval:
+                            x, y, w, h = annot['bbox']
+                            # @TODO: make sure coco category_id is compatible with MOT's
+                            category_id = self.coco_orig_category_id_to_sorted_order_dict[annot['category_id']]
+
+
+                            if image_id != previous_img_id and previous_img_id != None:
+                                mot_seq_current_img_id += 1
+                            previous_img_id = image_id
+
+                            mot_annotation_frame_id = mot_seq_current_img_id
+                            mot_annotation_track_id = annot['track_id']+1
+                            mot_processed_annotations.append([mot_annotation_frame_id,
+                                                            mot_annotation_track_id, 
+                                                            x, y, w, h,
+                                                            1.0, 
+                                                            category_id,
+                                                            1.0])
+
                     else:
                         nan_track_id_count += 1
                         print("track id is nan!", nan_track_id_count)
                         print("track id == nan annotation", annot)
+
+            if mot_for_tracking_eval:
+                # generate artificial mot gt from coco
+                seq_path = os.path.join(self.dataset_base_path, seq)
+                mot_path = os.path.join(seq_path, 'gt')
+                mot_txt_path = os.path.join(mot_path, 'gt.txt')
+                if os.path.isdir(mot_path):
+                    import shutil
+                    shutil.rmtree(mot_path)
+                os.makedirs(mot_path)
+                with open(mot_txt_path, 'w', newline='') as f:
+                    writer = csv.writer(f)
+                    writer.writerows(mot_processed_annotations)
 
         return processed_annotations
 
