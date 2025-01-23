@@ -279,6 +279,8 @@ def create_legend_handles(
     Returns:
         list: A list of legend handles.
     """
+    # @TODO: add explanation of track query and object query
+    # object queries ( num of true query_keep / (all=false+true) box predicted by model-num_track_queries_with_id)
     legend_handles = [
         mpatches.Patch(
             color='green',
@@ -342,13 +344,13 @@ def visualize_frame_targets(axarr, target, frame_prefixes=['prev', 'prev_prev'])
 def prepare_images_and_ids(target, img, frame_prefixes, inv_normalize):
     img_groups = [[inv_normalize(img[:3]).cpu(), img[3:].cpu()]]
     img_ids = [target['image_id'].item()]
-
+    # previous or prev_previous img is appended in img_groups.
     for key in frame_prefixes:
         if f'{key}_image' in target:
             img_groups.append(
                 [inv_normalize(target[f'{key}_image'][:3]).cpu(), img[3:].cpu()])
             img_ids.append(target[f'{key}_target'][f'image_id'].item())
-
+    # @TODO: explain why in img_ids example [7,3] second img id(which is prev_image id) is not consecutive in reverse order?
     return img_groups, img_ids
 
 
@@ -392,7 +394,7 @@ def display_images(axarr, img_groups, img_ids):
         ax2.imshow(img_group[1].squeeze(), cmap='gray')
         ax2.set_axis_off()  # 축 제거
 
-        draw_text(ax1, 0, 0, f'IMG_ID={img_id}')
+        draw_text(ax1, 0, 20, f'IMG_ID={img_id}')
 
         axs.append(ax1)
         axs.append(ax2)
@@ -417,7 +419,7 @@ def process_and_visualize_box(
     Args:
         ax (matplotlib.axes.Axes): The Axes object to draw the visuals on.
         box_id (int): The index of the current bounding box.
-        prop_i
+        prop_i @TODO: detailed explanation
         keep (numpy.ndarray): An array indicating which boxes to keep.
         result (dict): The result dictionary containing 'scores', 'boxes', and optionally 'masks'.
         target (dict): The target dictionary containing tracking information.
@@ -428,17 +430,24 @@ def process_and_visualize_box(
     Returns:
         None
     """
+    #track_queries_fal_pos_mask (len: all predicted boxes) false positive-> red
     rect_color = 'red' if tracking and target['track_queries_fal_pos_mask'][box_id] else 'green'
     offset = 50 if tracking and target['track_queries_mask'][box_id] else 0
-    class_id = result['labels'][box_id]
+    class_id = result['labels'][box_id] # class_id : classification prediction
     text = f"class: {class_id}\n" + \
-        f"score(one class): {result['scores'][box_id]:0.2f}"
+        f"score(one class): {result['scores'][box_id]:0.2f}" # descript current box class and score
 
     if tracking:
+        # filter out false positive track queries 
         if target['track_queries_fal_pos_mask'][box_id]:
             rect_color = 'red'
+        # draw blue box if track queries mask is true
         elif target['track_queries_mask'][box_id]:
             rect_color = 'blue'
+            # renew text if target track query is captured
+            # descript class, score(note scores are per class),
+            # @TODO: detailed explanation about visualizing tracking object
+            # track id(indexed by prop_i), result['track_queries_with_id_iou']
             text = f"class: {class_id}({result['class_scores'][box_id][class_id]:0.2f})\n" + \
                 f"track: {track_ids[prop_i]}({result['track_queries_with_id_iou'][prop_i]:0.2f})"
             prop_i += 1
@@ -529,7 +538,7 @@ def vis_results(
         num_track_queries = len(target['track_query_boxes'])
         num_track_queries_with_id = len(target['track_query_match_ids'])
         track_ids = target['track_ids'][target['track_query_match_ids']]
-
+    # result['boxes'] 는 result수, 4 크기의 텐서. scores가 score no object 이상인 것만 keep!
     keep = result['scores'].cpu() > result['scores_no_object'].cpu()
 
     cmap = get_hsv_color_map(len(keep))
@@ -545,10 +554,10 @@ def vis_results(
         track_ids,
         cmap
     )
-
+    # @TODO: detailed explanation of query_keep
     query_keep = keep
     if tracking:
-        track_queries_mask = target['track_queries_mask'].to(keep.device)
+        track_queries_mask = target['track_queries_mask'].to(keep.device) # @TODO: target['track_queries_mask']
         query_keep = keep[track_queries_mask == 0]
 
     legend_handles = create_legend_handles(

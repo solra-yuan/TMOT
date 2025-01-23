@@ -48,10 +48,10 @@ class FLIR_ADAS_V2(CocoDetection):
             return {'start': 0, 'end': 1.0}
 
     def seq_length(self, idx):
-        if self.frame_range != None:
-            start_frame = int(self.frame_range['start'] * self.coco.imgs[idx]['seq_length'])
-            end_frame = int(self.frame_range['end'] * self.coco.imgs[idx]['seq_length'])
-            return end_frame - start_frame  # Return the length of the selected range
+        # if self.frame_range != None:
+        #     start_frame = int(self.frame_range['start'] * self.coco.imgs[idx]['seq_length'])
+        #     end_frame = int(self.frame_range['end'] * self.coco.imgs[idx]['seq_length'])
+        #     return end_frame - start_frame  # Return the length of the selected range
         return self.coco.imgs[idx]['seq_length']
 
     def sample_weight(self, idx):
@@ -78,9 +78,11 @@ class FLIR_ADAS_V2(CocoDetection):
 
             # PREV
             # first frame has no previous frame
-            prev_frame_id = random.randint(
-                max(0, frame_id - self._prev_frame_range),
-                min(frame_id + self._prev_frame_range, self.seq_length(idx) - 1))
+            start = max(0, frame_id - self._prev_frame_range) 
+            stop = min(frame_id + self._prev_frame_range, self.seq_length(idx) - 1)
+            if start > stop:
+                raise ValueError(f"Invalid range for randint: start={start}, stop={stop}")
+            prev_frame_id = random.randint(start, stop)
             prev_image_id = self.coco.imgs[idx]['first_frame_image_id'] + \
                 prev_frame_id
 
@@ -180,10 +182,10 @@ class FLIR_ADAS_V2_thermal(CocoDetection):
             return {'start': 0, 'end': 1.0}
 
     def seq_length(self, idx):
-        if self.frame_range != None:
-            start_frame = int(self.frame_range['start'] * self.coco.imgs[idx]['seq_length'])
-            end_frame = int(self.frame_range['end'] * self.coco.imgs[idx]['seq_length'])
-            return end_frame - start_frame  # Return the length of the selected range        
+        # if self.frame_range != None:
+        #     start_frame = int(self.frame_range['start'] * self.coco.imgs[idx]['seq_length'])
+        #     end_frame = int(self.frame_range['end'] * self.coco.imgs[idx]['seq_length'])
+        #     return end_frame - start_frame  # Return the length of the selected range        
         return self.coco.imgs[idx]['seq_length']
 
     def sample_weight(self, idx):

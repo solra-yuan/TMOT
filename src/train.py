@@ -143,7 +143,7 @@ def train(args: Namespace) -> None:
         args.num_workers = 0
 
     if args.tracking_eval == 'false':
-        args.tracking_eval = False
+        args.tracking_eval = True
 
     if not args.deformable:
         assert args.num_feature_levels == 1
@@ -389,6 +389,7 @@ def train(args: Namespace) -> None:
         if args.eval_train:
             random_transforms = data_loader_train.dataset._transforms
             data_loader_train.dataset._transforms = data_loader_val.dataset._transforms
+            print(f"eval train on {epoch}")
             evaluate(
                 model, criterion, postprocessors, data_loader_train, device,
                 output_dir, visualizers['train'], args, epoch)

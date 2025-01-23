@@ -74,7 +74,7 @@ class FLIR_ADAS_V2_CONCATSequence(Dataset):
 
             self.data = self._sequence()
             self.no_gt = not osp.exists(self.get_gt_file_path())
-        self.no_gt = True #@TODO: 역시 죽을수도 있지만 강제입력한 것이므로 정리할것
+        self.no_gt = False #@TODO: 역시 죽을수도 있지만 강제입력한 것이므로 정리할것
 
     def __len__(self) -> int:
         return len(self.data)
@@ -186,14 +186,13 @@ class FLIR_ADAS_V2_CONCATSequence(Dataset):
         with open(gt_file, "r") as inf:
             reader = csv.reader(inf, delimiter=',')
             for row in reader:
-                # class person, certainity 1
+                # class person, certainity 1 # @TODO: row[7] is class, and now it only accepts 1. extend this to all class
                 if int(float(row[6])) == 1 and int(float(row[7])) == 1 and float(row[8]) >= self._vis_threshold:
-                    # Make pixel indexes 0-based, should already be 0-based (or not)
-                    x1 = int(row[2]) - 1
-                    y1 = int(row[3]) - 1
-                    # This -1 accounts for the width (width of 1 x1=x2)
-                    x2 = x1 + int(row[4]) - 1
-                    y2 = y1 + int(row[5]) - 1
+
+                    x1 = int(row[2])
+                    y1 = int(row[3])
+                    x2 = x1 + int(row[4])
+                    y2 = y1 + int(row[5])
                     bbox = np.array([x1, y1, x2, y2], dtype=np.float32)
 
                     frame_id = int(row[0])
