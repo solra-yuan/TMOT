@@ -37,6 +37,42 @@ def calculate_box_iou_for_track_queries(result, target):
     print()
 
 def make_results(outputs, targets, postprocessors, tracking, return_only_orig=True):
+    """
+    make result(e.g. bbox class etc.,) given bbox and track query with given outputs
+    (0,1) normalized output bbox and track_query_boxes are adjusted to fit original image size
+
+    results example for flir_adas_v2 data
+    - results(-> list of dict), each item contains information for a frame(and its previous frame(s))
+        keys
+        - class_scores
+        - scores
+        - scores_no_object
+        - labels
+        - boxes
+        - target(->dict) 
+            keys
+            - boxes
+            - labels
+            - image_id
+            - track_ids
+            - area
+            - iscrowd
+            - orig_size
+            - size
+            - labels_ignore
+            - area_ignore
+            - iscrowd_ignore
+            - boxes_ignore
+            - track_ids_ignore
+            _ prev_image
+            _ prev_target
+            _ track_query_match_ids
+            _ track_query_hs_embeds
+            _ track_query_boxes
+            _ track_queries_mask
+            _ track_queries_fal_pos_mask
+
+    """
     target_sizes = torch.stack([t["size"] for t in targets], dim=0)
     orig_target_sizes = torch.stack([t["orig_size"] for t in targets], dim=0)
 
