@@ -178,7 +178,8 @@ def vis_previous_frames(ax, frame_target, get_cmap):
 
     Parameters:
     - ax: The matplotlib axes to draw on.
-    - frame_target: A dictionary containing 'track_ids', 'boxes', and optionally 'masks'.
+    - frame_target: previous image's target,
+        A dictionary containing 'track_ids', 'boxes', and optionally 'masks'.
     - get_cmap: A function that takes an index and returns a colormap.
     """
     for j, track_id in enumerate(frame_target['track_ids']):
@@ -187,7 +188,7 @@ def vis_previous_frames(ax, frame_target, get_cmap):
             ax,
             x1,
             y1,
-            f"track_id: {track_id}\nlable: {frame_target['labels'][j]}"
+            f"trck:{track_id},cls:{frame_target['labels'][j]}"
         )
         draw_rectangle(ax, x1, y1, x2, y2)
 
@@ -434,8 +435,7 @@ def process_and_visualize_box(
     rect_color = 'red' if tracking and target['track_queries_fal_pos_mask'][box_id] else 'green'
     offset = 50 if tracking and target['track_queries_mask'][box_id] else 0
     class_id = result['labels'][box_id] # class_id : classification prediction
-    text = f"class: {class_id}\n" + \
-        f"score(one class): {result['scores'][box_id]:0.2f}" # descript current box class and score
+    text = f"class: {class_id}({result['scores'][box_id]:0.2f})" # descript current box class and score
 
     if tracking:
         # filter out false positive track queries 
@@ -448,8 +448,7 @@ def process_and_visualize_box(
             # descript class, score(note scores are per class),
             # @TODO: detailed explanation about visualizing tracking object
             # track id(indexed by prop_i), result['track_queries_with_id_iou']
-            text = f"class: {class_id}({result['class_scores'][box_id][class_id]:0.2f})\n" + \
-                f"track: {track_ids[prop_i]}({result['track_queries_with_id_iou'][prop_i]:0.2f})"
+            text = f"cls:{class_id}({result['class_scores'][box_id][class_id]:0.2f}),trck:{track_ids[prop_i]}({result['track_queries_with_id_iou'][prop_i]:0.2f})"
             prop_i += 1
 
     if not keep[box_id]:

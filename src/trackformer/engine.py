@@ -38,7 +38,8 @@ def calculate_box_iou_for_track_queries(result, target):
 
 def make_results(outputs, targets, postprocessors, tracking, return_only_orig=True):
     """
-    make result(e.g. bbox class etc.,) given bbox and track query with given outputs
+    make result(e.g. bbox class etc.,)of current frame and previous image
+    bbox and track query box
     (0,1) normalized output bbox and track_query_boxes are adjusted to fit original image size
 
     results example for flir_adas_v2 data
@@ -68,9 +69,10 @@ def make_results(outputs, targets, postprocessors, tracking, return_only_orig=Tr
             _ prev_target
             _ track_query_match_ids
             _ track_query_hs_embeds
-            _ track_query_boxes
+            _ track_query_boxes : prev_image의 예측 박스를 의미
             _ track_queries_mask
             _ track_queries_fal_pos_mask
+        - track_queries_with_id_iou
 
     """
     target_sizes = torch.stack([t["size"] for t in targets], dim=0)
