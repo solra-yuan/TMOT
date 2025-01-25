@@ -52,7 +52,7 @@ class DETRTrackingBase(nn.Module):
                 배치 단위로 입력 및 리턴 받음.
             -prev_out: 현재 타겟의 "prev_image"를 DETR model로 설정된 모델 클래스의 forward 함수에 입력 후,
                 리턴값 중 첫 번째 인자
-            -add_false_pos: optional, false positive 샘플 생성여부
+            -add_false_pos: optional, false positive 
         
         타겟에 추가하는 키 정보
             - track_query_match_ids : 

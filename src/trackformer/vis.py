@@ -130,21 +130,21 @@ class ImgVis(BaseVis):
         self.viz.save([self.viz.env])
 
 
-def draw_text(ax, x, y, text, fontsize=10, bbox=dict(facecolor='white', alpha=0.5)):
+def draw_text(ax, x, y, text, fontsize=7, bbox=dict(facecolor='white', alpha=0.4, boxstyle="Square,pad=0.15")):
     ax.text(x, y, text, fontsize=fontsize, bbox=bbox)
 
 
-def draw_track_id(ax, x, y, track_id, fontsize=10, bbox=dict(facecolor='white', alpha=0.5)):
+def draw_track_id(ax, x, y, track_id, fontsize=7, bbox=dict(facecolor='white', alpha=0.4, boxstyle="Square,pad=0.15")):
     """Displays the tracking ID on the graphic."""
     draw_text(ax, x, y, f"track_id={track_id}", fontsize=fontsize,  bbox=bbox)
 
 
-def draw_label(ax, x, y, lable, fontsize=10, bbox=dict(facecolor='white', alpha=0.5)):
+def draw_label(ax, x, y, lable, fontsize=7, bbox=dict(facecolor='white', alpha=0.4, boxstyle="Square,pad=0.15")):
     """Displays the tracking ID on the graphic."""
     draw_text(ax, x, y+10,  f"lable={lable}", fontsize=fontsize, bbox=bbox)
 
 
-def draw_rectangle(ax, x1, y1, x2, y2, fill=False, color='green', linewidth=2):
+def draw_rectangle(ax, x1, y1, x2, y2, fill=False, color='green', linewidth=1.5):
     """Draws a rectangle on the graphic."""
     ax.add_patch(plt.Rectangle(
         (x1, y1),
@@ -152,7 +152,8 @@ def draw_rectangle(ax, x1, y1, x2, y2, fill=False, color='green', linewidth=2):
         y2 - y1,
         fill=fill,
         color=color,
-        linewidth=linewidth
+        linewidth=linewidth,
+        alpha=0.7
     ))
 
 
@@ -181,6 +182,7 @@ def vis_previous_frames(ax, frame_target, get_cmap):
     - frame_target: previous image's target,
         A dictionary containing 'track_ids', 'boxes', and optionally 'masks'.
     - get_cmap: A function that takes an index and returns a colormap.
+    - tracking: if tracking
     """
     for j, track_id in enumerate(frame_target['track_ids']):
         x1, y1, x2, y2 = frame_target['boxes'][j]
@@ -188,7 +190,7 @@ def vis_previous_frames(ax, frame_target, get_cmap):
             ax,
             x1,
             y1,
-            f"trck:{track_id},cls:{frame_target['labels'][j]}"
+            f"{frame_target['labels'][j]},{track_id}" #class, track id
         )
         draw_rectangle(ax, x1, y1, x2, y2)
 
@@ -198,6 +200,18 @@ def vis_previous_frames(ax, frame_target, get_cmap):
             cmap = get_cmap(j)
             draw_mask(ax, mask, cmap)
 
+def vis_previous_detection(ax, target):
+    """visualizes track_query match track ids
+    이전 프레임에서 예측했던 박스가 이번 프레임에서도 유지되는 경우 잘 추적하는지 확인 
+    이전 프레임에서 예측된 박스(파랑) 시각화
+    @TODO: 클래스, 트랙 id 시각화하고 다음 프레임에 예측 안되었으면 빨강으로
+    Parameters:
+        -ax: The matplotlib axes to draw on.
+        -target: current frame's target,
+
+    """
+    for x1, y1, x2, y2 in target['track_query_boxes']:
+        draw_rectangle(ax, x1, y1, x2, y2, color='blue')
 
 def append_legend_handles_for_unmatched_track_queries(
     track_queries_fal_pos_mask,
@@ -316,7 +330,7 @@ def create_legend_handles(
     return legend_handles
 
 
-def visualize_frame_targets(axarr, target, frame_prefixes=['prev', 'prev_prev']):
+def visualize_frame_targets(axarr, target, frame_prefixes=['prev', 'prev_prev'], tracking=None):
     """
     Visualizes the tracking information for previous frames.
 
@@ -327,6 +341,7 @@ def visualize_frame_targets(axarr, target, frame_prefixes=['prev', 'prev_prev'])
     """
     # Initialize the index for subplot axes.
     i = 0
+    vis_previous_detection(axarr[0], target)
 
     for frame_prefix in frame_prefixes:
         # Check if the target contains the target information for the current frame prefix.
@@ -340,6 +355,7 @@ def visualize_frame_targets(axarr, target, frame_prefixes=['prev', 'prev_prev'])
 
         vis_previous_frames(axarr[i], frame_target, get_cmap)
         i += 1
+    
 
 
 def prepare_images_and_ids(target, img, frame_prefixes, inv_normalize):
@@ -435,7 +451,7 @@ def process_and_visualize_box(
     rect_color = 'red' if tracking and target['track_queries_fal_pos_mask'][box_id] else 'green'
     offset = 50 if tracking and target['track_queries_mask'][box_id] else 0
     class_id = result['labels'][box_id] # class_id : classification prediction
-    text = f"class: {class_id}({result['scores'][box_id]:0.2f})" # descript current box class and score
+    text = f"cls: {class_id}({result['scores'][box_id]:0.2f})" # descript current box class and score
 
     if tracking:
         # filter out false positive track queries 
@@ -567,11 +583,12 @@ def vis_results(
         num_track_queries_with_id
     )
     axs[0].legend(handles=legend_handles)
-
+    #@TODO: visualize_frame_targets 에서 이전프레임의 예측박스와 클래스확률
     visualize_frame_targets(
         axs[2:],
         target,
-        frame_prefixes=frame_prefixes
+        frame_prefixes=frame_prefixes,
+        tracking=tracking
     )
 
     plt.subplots_adjust(wspace=0.01, hspace=0.01)
