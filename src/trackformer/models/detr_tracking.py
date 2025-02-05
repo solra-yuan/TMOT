@@ -40,8 +40,8 @@ class DETRTrackingBase(nn.Module):
         '''
         description
             이전 프레임의 예측된 트랙 아이디와 현재 프레임의 타겟의 트랙 아이디가 일치하는지 확인하고
-            프레임을 거쳐 유지된 트랙의 정보 
-            (이전 프레임의 예측된 트랙값, 그외 예측값 정보)를 현재 타겟에 추가해 줌
+            프레임을 거쳐 유지된 트랙의 정보(이전 프레임의 예측된 트랙값, 해당 트랙의 박스, emb 외 정보)
+            를 현재 타겟에 추가해 줌
         
         inputs
             -targets: 현재 샘플 배치의 각 타겟 변수가 담긴 리스트 
@@ -52,6 +52,13 @@ class DETRTrackingBase(nn.Module):
                 배치 단위로 입력 및 리턴 받음.
             -prev_out: 현재 타겟의 "prev_image"를 DETR model로 설정된 모델 클래스의 forward 함수에 입력 후,
                 리턴값 중 첫 번째 인자
+                keys:
+                    - pred_logits
+                    - pred_boxes
+                    - hs_embed
+                    - aux_outputs (model.aux_loss=True일 떄)
+                    - enc_outputs (model.two_stage=True일 때)
+
             -add_false_pos: optional, false positive 
         
         타겟에 추가하는 키 정보
@@ -59,11 +66,13 @@ class DETRTrackingBase(nn.Module):
                 이전 프레임의 예측된 트랙 아이디와 현재 프레임의 정답 타겟 아이디를 비교하여 일치하는 트랙 아이디  
                 (target_ind_matched_idx)
             - track_query_hs_embeds : 
-                이전 프레임의 예측된 값, hs_embed
+                현재 프레임에도 유지되는 track id의 이전 프레임에서 예측된 hs_embed 값
                 prev_out['hs_embed'][i, prev_out_ind]
             - track_query_boxes :
-                이전 프레임의 예측된 값, pred_boxes
+                현재 프레임에도 유지되는 track id의 이전 프레임의 예측된 pred_boxes
                 prev_out['pred_boxes'][i, prev_out_ind].detach()
+            - track_query_logits :
+                현재 프레임에도 유지되는 track id의 이전 프레임의 예측 로짓
             - track_queries_mask : 
                 트랙 쿼리 마스크
                 torch.cat([
@@ -220,6 +229,8 @@ class DETRTrackingBase(nn.Module):
                 track_queries_fal_pos_mask,
                 torch.tensor([False, ] * self.num_queries).to(device)
             ]).bool()
+
+            target['track_query_logits'] = prev_out['pred_logits'][i, prev_out_ind].detach()
 
         # add placeholder track queries to allow for batch sizes > 1
         # max_track_query_hs_embeds = max([len(t['track_query_hs_embeds']) for t in targets])

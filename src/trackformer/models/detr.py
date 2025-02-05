@@ -252,7 +252,6 @@ class SetCriterion(nn.Module):
         target_classes_onehot.scatter_(2, target_classes.unsqueeze(-1), 1)
 
         target_classes_onehot = target_classes_onehot[:, :, :-1]
-
         # query_mask = None
         # if self.tracking:
         #     query_mask = torch.stack([~t['track_queries_placeholder_mask'] for t in targets])[..., None]
@@ -279,7 +278,6 @@ class SetCriterion(nn.Module):
             # TODO this should probably be a separate loss, not hacked in this one here
             losses['class_error'] = 100 - \
                 accuracy(src_logits[idx], target_classes_o)[0]
-
         # compute seperate track and object query losses
         # loss_ce = sigmoid_focal_loss(
         #     src_logits, target_classes_onehot, num_boxes,
@@ -300,6 +298,25 @@ class SetCriterion(nn.Module):
         # losses['loss_ce_object_queries'] = loss_ce[idx][~track_query_target_masks].mean(1).sum() / num_boxes
 
         return losses
+
+    @torch.no_grad()
+    def labels_count(self, outputs, targets, indices, num_boxes, log=True):
+            """label count, does not propagate any loss(just for logging purpose)"""
+            assert 'pred_logits' in outputs
+            target_classes_o = torch.cat([
+                t["labels"][J] for t, (_, J) in zip(targets, indices)]
+            )
+            #target class item count
+            target_classes_count = {f'class_count_{k}':0 for k in range(20)}
+            for i in target_classes_o:
+                if f"class_count_{i.item()}" in target_classes_count:
+                    target_classes_count[f"class_count_{i.item()}"] += 1        
+                else:
+                    AssertionError(f'{i.item()} should be key of labels_count. Make sure # class is equal to 20.')
+
+            losses = {'class_count': target_classes_count}
+
+            return losses
 
     @torch.no_grad()
     def loss_cardinality(self, outputs, targets, indices, num_boxes):
@@ -418,6 +435,7 @@ class SetCriterion(nn.Module):
             'cardinality': self.loss_cardinality,
             'boxes': self.loss_boxes,
             'masks': self.loss_masks,
+            'counts': self.labels_count
         }
         assert loss in loss_map, f'do you really want to compute {loss} loss?'
         return loss_map[loss](outputs, targets, indices, num_boxes, **kwargs)
@@ -433,7 +451,12 @@ class SetCriterion(nn.Module):
         outputs_without_aux = {
             k: v for k, v in outputs.items() if k != 'aux_outputs'
         }
-
+        '''
+        @TODO: loss and metric check
+        for i in outputs_without_aux:
+            print(f'key:{i}, type:{[type(output_item) for output_item in outputs_without_aux[i]]}, shape:{[output_item.shape for output_item in outputs_without_aux[i] if type(output_item)==torch.Tensor]}')
+            print(outputs_without_aux[i])
+        '''
         # Retrieve the matching between the outputs of the last layer and the targets
         indices = self.matcher(outputs_without_aux, targets)
 

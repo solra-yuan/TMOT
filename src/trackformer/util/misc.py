@@ -247,9 +247,16 @@ class MetricLogger(object):
                         time=str(iter_time), data=str(data_time)))
 
                 if self.vis is not None:
-                    y_data = [self.meters[legend_name].median
-                              for legend_name in self.vis.viz_opts['legend']
-                              if legend_name in self.meters]
+                    y_data = []
+                    for legend_name in self.vis.viz_opts['legend']:
+                        if legend_name in self.meters.keys():
+                            if 'class_count' not in legend_name:
+                                y_data.append(self.meters[legend_name].median) 
+                            else:
+                                y_data.append(self.meters[legend_name].total)
+                    # y_data = [self.meters[legend_name].median
+                    #           for legend_name in self.vis.viz_opts['legend']
+                    #           if legend_name in self.meters.keys()]
                     y_data.append(iter_time.median)
 
                     self.vis.plot(y_data, i * get_world_size() + (epoch - 1) * world_len_iterable)

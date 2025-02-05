@@ -159,6 +159,8 @@ def train_one_epoch(model: torch.nn.Module, criterion: torch.nn.Module, postproc
         debug=args.debug)
     metric_logger.add_meter('lr', utils.SmoothedValue(window_size=1, fmt='{value:.6f}'))
     metric_logger.add_meter('class_error', utils.SmoothedValue(window_size=1, fmt='{value:.2f}'))
+    # for i in range(20): #@TODO : make hardcoded #classes 20 adaptive to #class label
+    #     metric_logger.add_meter(f'class_count_{i}', utils.SmoothedValue(window_size=1, fmt='{value:.2f}'))
 
     for i, (samples, targets) in enumerate(metric_logger.log_every(data_loader, epoch)):
         samples = samples.to(device)
@@ -175,14 +177,18 @@ def train_one_epoch(model: torch.nn.Module, criterion: torch.nn.Module, postproc
 
         # reduce losses over all GPUs for logging purposes
         loss_dict_reduced = utils.reduce_dict(loss_dict)
+        loss_dict_label_count = {k:v for k,v in loss_dict_reduced.items() if 'class_count' == k} #@TODO: configure why label count dict have 5 class_count items
+        label_count = {k:v for k,v in loss_dict_label_count['class_count'].items()}
+        loss_dict_reduced = {k:v for k,v in loss_dict_reduced.items() if 'class_count' not in k}
+        
         loss_dict_reduced_unscaled = {
             f'{k}_unscaled': v for k, v in loss_dict_reduced.items()}
         loss_dict_reduced_scaled = {
             k: v * weight_dict[k] for k, v in loss_dict_reduced.items() if k in weight_dict}
         losses_reduced_scaled = sum(loss_dict_reduced_scaled.values())
-
+        '''@TODO: loss debug for item in loss_dict_reduced_scaled:
+        print(f"{item}, : {loss_dict_reduced_scaled[item]}")'''
         loss_value = losses_reduced_scaled.item()
-
         if not math.isfinite(loss_value):
             print(f"Loss is {loss_value}, stopping training")
             print(loss_dict_reduced)
@@ -200,6 +206,8 @@ def train_one_epoch(model: torch.nn.Module, criterion: torch.nn.Module, postproc
         metric_logger.update(class_error=loss_dict_reduced['class_error'])
         metric_logger.update(lr=optimizer.param_groups[0]["lr"],
                              lr_backbone=optimizer.param_groups[1]["lr"])
+        for k,v in label_count.items():
+            metric_logger.update(**{k:v})
 
         if visualizers and (i == 0 or not i % args.vis_and_log_interval):
             _, results = make_results(
@@ -268,6 +276,10 @@ def evaluate(model, criterion, postprocessors, data_loader, device,
 
         # reduce losses over all GPUs for logging purposes
         loss_dict_reduced = utils.reduce_dict(loss_dict)
+        loss_dict_label_count = {k:v for k,v in loss_dict_reduced.items() if 'class_count' == k} #@TODO: configure why label count dict have 5 class_count items
+        label_count = {k:v for k,v in loss_dict_label_count['class_count'].items()}
+        loss_dict_reduced = {k:v for k,v in loss_dict_reduced.items() if 'class_count' not in k}
+        
         loss_dict_reduced_scaled = {k: v * weight_dict[k]
                                     for k, v in loss_dict_reduced.items() if k in weight_dict}
         loss_dict_reduced_unscaled = {f'{k}_unscaled': v
@@ -276,6 +288,8 @@ def evaluate(model, criterion, postprocessors, data_loader, device,
                              **loss_dict_reduced_scaled,
                              **loss_dict_reduced_unscaled)
         metric_logger.update(class_error=loss_dict_reduced['class_error'])
+        for k,v in label_count.items():
+            metric_logger.update(**{k:v})
 
         if visualizers and (i == 0 or not i % args.vis_and_log_interval):
             results_orig, results = make_results(
@@ -406,7 +420,7 @@ def evaluate(model, criterion, postprocessors, data_loader, device,
     # VIS
     if visualizers:
         vis_epoch = visualizers['epoch_metrics']
-        y_data = [stats[legend_name] for legend_name in vis_epoch.viz_opts['legend']]
+        y_data = [stats[legend_name] for legend_name in vis_epoch.viz_opts['legend'] if legend_name in stats]
 
         vis_epoch.plot(y_data, epoch)
 

@@ -200,7 +200,7 @@ def vis_previous_frames(ax, frame_target, get_cmap):
             cmap = get_cmap(j)
             draw_mask(ax, mask, cmap)
 
-def vis_previous_detection(ax, target):
+def vis_previous_detection(ax, target, tracking):
     """visualizes track_query match track ids
     이전 프레임에서 예측했던 박스가 이번 프레임에서도 유지되는 경우 잘 추적하는지 확인 
     이전 프레임에서 예측된 박스(파랑) 시각화
@@ -208,10 +208,39 @@ def vis_previous_detection(ax, target):
     Parameters:
         -ax: The matplotlib axes to draw on.
         -target: current frame's target,
-
+        -tracking: if tracking is True
     """
-    for x1, y1, x2, y2 in target['track_query_boxes']:
-        draw_rectangle(ax, x1, y1, x2, y2, color='blue')
+    # for item in target['track_query_pred_logits']:
+    #     item
+    
+    # score : softmax score among all classes
+    prop_i = 0
+
+    if tracking:
+        for i in range(len(target['track_query_boxes'])):
+            x1, y1, x2, y2 = target['track_query_boxes'][i]
+            prob = target['track_query_logits'][i].sigmoid()
+            scores, label = prob.max(-1)
+            class_scores = torch.nn.functional.softmax(target['track_query_logits'][i])
+            class_score = class_scores[label]
+            text = f"{label}({float(class_score.cpu().detach()):0.2f})"
+            if target['track_queries_fal_pos_mask'][i]:
+                rect_color = 'yellow'
+            # draw blue box if track queries mask is true
+            elif target['track_queries_mask'][i]:
+                rect_color = 'blue'
+                # renew text if target track query is captured
+                # descript class, score(note scores are per class),
+                # @TODO: detailed explanation about visualizing tracking object
+                # track id(indexed by prop_i), result['track_queries_with_id_iou']
+                text = f"{label}({float(class_score.cpu().detach()):0.2f}),{target['track_query_match_ids'][prop_i]}"
+                prop_i += 1
+
+            draw_rectangle(ax, x1, y1, x2, y2, color=rect_color)
+            offset = 5
+            draw_text(ax, x1, y1 + offset, text)
+
+    
 
 def append_legend_handles_for_unmatched_track_queries(
     track_queries_fal_pos_mask,
@@ -341,7 +370,7 @@ def visualize_frame_targets(axarr, target, frame_prefixes=['prev', 'prev_prev'],
     """
     # Initialize the index for subplot axes.
     i = 0
-    vis_previous_detection(axarr[0], target)
+    vis_previous_detection(axarr[0], target, tracking)
 
     for frame_prefix in frame_prefixes:
         # Check if the target contains the target information for the current frame prefix.
@@ -694,6 +723,8 @@ def build_visualizers(
         'lr_backbone',
         'iter_time'
     ])
+
+    legend.extend([f'class_count_{i}' for i in range(20)]) #log class counts. #@TODO: make this adaptive to #class
 
     opts = dict(
         title="TRAIN METRICS ITERS",
