@@ -504,7 +504,7 @@ def process_and_visualize_box(
         # False negative 모델에 의해 track으로 탐지는 되었지만 keep 점수가 낮았던 물체를 주황색으로 표시
         if target['track_queries_mask'][box_id]==False:
             return prop_i
-        elif target['track_queries_mask'][box_id]==True:
+        elif tracking and target['track_queries_mask'][box_id]==True:
             rect_color = 'orange' #출력 텍스트는 위에 계산한 정보를 그대로 가져온다.
         # @TODO: FN 오브젝트 쿼리를 표시 
 
