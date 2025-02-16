@@ -106,7 +106,7 @@ def build_model(args):
             aux_weight_dict.update({k + f'_enc': v for k, v in weight_dict.items()})
         weight_dict.update(aux_weight_dict)
 
-    losses = ['labels', 'boxes', 'cardinality', 'counts']  # define criterion's self.losses -> 3 sort of default losses, 'count' for additional class count debugging
+    losses = ['labels', 'boxes', 'cardinality', 'counts', 'class_bce']  # define criterion's self.losses -> 3 sort of default losses, 'count' for additional class count debugging
     if args.masks:
         losses.append('masks')  # 4 sort of losses, additional masks loss to 3 sort of default losses, if in case of "masks" flag.
 

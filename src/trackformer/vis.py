@@ -173,7 +173,7 @@ def draw_mask(ax, mask, cmap, alpha=0.5):
     ax.imshow(masked_mask, alpha=alpha, cmap=cmap)
 
 
-def vis_previous_frames(ax, frame_target, get_cmap):
+def vis_previous_frame(ax, frame_target, get_cmap, color='blue'):
     """
     Visualizes previous frames with tracking IDs, bounding boxes, and masks.
 
@@ -192,7 +192,7 @@ def vis_previous_frames(ax, frame_target, get_cmap):
             y1,
             f"{frame_target['labels'][j]},{track_id}" #class, track id
         )
-        draw_rectangle(ax, x1, y1, x2, y2)
+        draw_rectangle(ax, x1, y1, x2, y2, color=color)
 
         if 'masks' in frame_target:
             mask = frame_target['masks'][j].cpu().numpy()
@@ -202,8 +202,8 @@ def vis_previous_frames(ax, frame_target, get_cmap):
 
 def vis_previous_detection(ax, target, tracking):
     """visualizes track_query match track ids
+    이전 프레임 예측된 박스 시각화
     이전 프레임에서 예측했던 박스가 이번 프레임에서도 유지되는 경우 잘 추적하는지 확인 
-    이전 프레임에서 예측된 박스(파랑) 시각화
     @TODO: 클래스, 트랙 id 시각화하고 다음 프레임에 예측 안되었으면 빨강으로
     Parameters:
         -ax: The matplotlib axes to draw on.
@@ -370,8 +370,9 @@ def visualize_frame_targets(axarr, target, frame_prefixes=['prev', 'prev_prev'],
     """
     # Initialize the index for subplot axes.
     i = 0
+    # 이전 프레임의 예측 시각화 @TODO: 정답 시각화에서 예측 시각화 분리
     vis_previous_detection(axarr[0], target, tracking)
-
+    # 이전 프레임의 타겟 시각화
     for frame_prefix in frame_prefixes:
         # Check if the target contains the target information for the current frame prefix.
         if f'{frame_prefix}_target' not in target:
@@ -382,7 +383,7 @@ def visualize_frame_targets(axarr, target, frame_prefixes=['prev', 'prev_prev'],
 
         get_cmap = get_hsv_color_map(num_track_ids)
 
-        vis_previous_frames(axarr[i], frame_target, get_cmap)
+        vis_previous_frame(axarr[i], frame_target, get_cmap, color='blue')
         i += 1
     
 
@@ -391,12 +392,13 @@ def prepare_images_and_ids(target, img, frame_prefixes, inv_normalize):
     img_groups = [[inv_normalize(img[:3]).cpu(), img[3:].cpu()]]
     img_ids = [target['image_id'].item()]
     # previous or prev_previous img is appended in img_groups.
+    # img_ids and second (prev_image) id might not be consecutive or might be in reversed order, 
+    # but objects in the images can overlap.
     for key in frame_prefixes:
         if f'{key}_image' in target:
             img_groups.append(
                 [inv_normalize(target[f'{key}_image'][:3]).cpu(), img[3:].cpu()])
             img_ids.append(target[f'{key}_target'][f'image_id'].item())
-    # @TODO: explain why in img_ids example [7,3] second img id(which is prev_image id) is not consecutive in reverse order?
     return img_groups, img_ids
 
 
@@ -497,7 +499,14 @@ def process_and_visualize_box(
             prop_i += 1
 
     if not keep[box_id]:
-        return prop_i
+        # 트랙 쿼리에 대해 모델이 물체 가능성이 낮다고 점수를 준 경우 
+        # (keep[box_id]가 False) 물체가 아닌 것으로 판단하였다.
+        # False negative 모델에 의해 track으로 탐지는 되었지만 keep 점수가 낮았던 물체를 주황색으로 표시
+        if target['track_queries_mask'][box_id]==False:
+            return prop_i
+        elif target['track_queries_mask'][box_id]==True:
+            rect_color = 'orange' #출력 텍스트는 위에 계산한 정보를 그대로 가져온다.
+        # @TODO: FN 오브젝트 쿼리를 표시 
 
     result_boxes = clip_boxes_to_image(result['boxes'], target['size'])
     x1, y1, x2, y2 = result_boxes[box_id]
@@ -588,7 +597,7 @@ def vis_results(
     cmap = get_hsv_color_map(len(keep))
 
     axs = display_images(axarr, img_groups, img_ids)
-
+    # 현재 프레임의 예측박스와 클래스확률을 0번 서브플롯에 시각화
     process_and_visualize_boxes(
         axs[0],
         keep,
@@ -612,7 +621,7 @@ def vis_results(
         num_track_queries_with_id
     )
     axs[0].legend(handles=legend_handles)
-    #@TODO: visualize_frame_targets 에서 이전프레임의 예측박스와 클래스확률
+    #visualize_frame_targets visualizes:
     visualize_frame_targets(
         axs[2:],
         target,
@@ -725,6 +734,7 @@ def build_visualizers(
     ])
 
     legend.extend([f'class_count_{i}' for i in range(20)]) #log class counts. #@TODO: make this adaptive to #class
+    legend.extend([f'class_bce_{i}' for i in range(20)]) #log class counts. #@TODO: make this adaptive to #class
 
     opts = dict(
         title="TRAIN METRICS ITERS",

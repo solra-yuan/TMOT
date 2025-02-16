@@ -250,10 +250,12 @@ class MetricLogger(object):
                     y_data = []
                     for legend_name in self.vis.viz_opts['legend']:
                         if legend_name in self.meters.keys():
-                            if 'class_count' not in legend_name:
-                                y_data.append(self.meters[legend_name].median) 
-                            else:
+                            if 'class_count' in legend_name:
                                 y_data.append(self.meters[legend_name].total)
+                            elif 'class_bce' in legend_name:
+                                y_data.append(self.meters[legend_name].total)
+                            else: 
+                                y_data.append(self.meters[legend_name].median) 
                     # y_data = [self.meters[legend_name].median
                     #           for legend_name in self.vis.viz_opts['legend']
                     #           if legend_name in self.meters.keys()]

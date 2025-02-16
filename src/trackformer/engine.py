@@ -177,7 +177,8 @@ def train_one_epoch(model: torch.nn.Module, criterion: torch.nn.Module, postproc
 
         # reduce losses over all GPUs for logging purposes
         loss_dict_reduced = utils.reduce_dict(loss_dict)
-        loss_dict_label_count = {k:v for k,v in loss_dict_reduced.items() if 'class_count' == k} #@TODO: configure why label count dict have 5 class_count items
+        loss_dict_label_count = {k:v for k,v in loss_dict_reduced.items() if 'class_count' == k} 
+        class_bce = {k:v for k,v in loss_dict_reduced.items() if 'class_bce' in k} 
         label_count = {k:v for k,v in loss_dict_label_count['class_count'].items()}
         loss_dict_reduced = {k:v for k,v in loss_dict_reduced.items() if 'class_count' not in k}
         
@@ -207,6 +208,8 @@ def train_one_epoch(model: torch.nn.Module, criterion: torch.nn.Module, postproc
         metric_logger.update(lr=optimizer.param_groups[0]["lr"],
                              lr_backbone=optimizer.param_groups[1]["lr"])
         for k,v in label_count.items():
+            metric_logger.update(**{k:v})
+        for k,v in class_bce.items():
             metric_logger.update(**{k:v})
 
         if visualizers and (i == 0 or not i % args.vis_and_log_interval):
