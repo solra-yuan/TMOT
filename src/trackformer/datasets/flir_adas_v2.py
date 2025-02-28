@@ -85,7 +85,7 @@ class FLIR_ADAS_V2(CocoDetection):
             prev_frame_id = random.randint(start, stop)
             prev_image_id = self.coco.imgs[idx]['first_frame_image_id'] + \
                 prev_frame_id
-
+            
             prev_img, prev_target = self._getitem_from_id(
                 prev_image_id, 
                 random_state,
