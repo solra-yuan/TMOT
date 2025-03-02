@@ -555,7 +555,7 @@ def process_and_visualize_box(
             # descript class, score(note scores are per class),
             # @TODO: detailed explanation about visualizing tracking object
             # true positive track id(indexed by prop_i), result['track_queries_with_id_iou']
-            text = f"cls:{class_id}({result['class_scores'][box_id][class_id]:0.2f}),trck:{track_ids[prop_i]}({result['track_queries_with_id_iou'][prop_i]:0.2f})"
+            text = f"{class_id}({result['class_scores'][box_id][class_id]:0.2f}),{track_ids[prop_i]}({result['track_queries_with_id_iou'][prop_i]:0.2f})"
             prop_i += 1
 
     if not keep[box_id]:

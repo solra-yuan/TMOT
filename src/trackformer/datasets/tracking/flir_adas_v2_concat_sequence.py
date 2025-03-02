@@ -96,7 +96,7 @@ class FLIR_ADAS_V2_CONCATSequence(Dataset):
 
         img, _ = self.transforms(img)
         thermal_img, _ = self.transforms(thermal_img)
-        resize = transforms.Resize(img.size()[-2:])  
+        resize = transforms.Resize(img.size()[-2:], antialias=True)  
         resized_thermal_img = resize(thermal_img)
         width, height = img.size(2), img.size(1)
 
