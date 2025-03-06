@@ -559,7 +559,7 @@ class Tracker:
             if track.attention_map is not None:
                 self.results[track.id][self.frame_index]['attention_map'] = \
                     track.attention_map.cpu().numpy()
-            print(f"[DEBUG] Updated results for track_id={track.id}: {self.results[track.id][self.frame_index]}")
+            #print(f"[DEBUG] Updated results for track_id={track.id}: {self.results[track.id][self.frame_index]}")
 
         for t in self.inactive_tracks:
             t.count_inactive += 1
@@ -572,9 +572,9 @@ class Tracker:
 
     def get_results(self):
         """Return current tracking results."""
-        print(f"[DEBUG] get_results called: {len(self.results)} tracks")
-        for track_id, frames in self.results.items():
-            print(f"[DEBUG] Track ID={track_id}, Frames={len(frames)}")
+        #print(f"[DEBUG] get_results called: {len(self.results)} tracks")
+        #for track_id, frames in self.results.items():
+        #    print(f"[DEBUG] Track ID={track_id}, Frames={len(frames)}")
 
         return self.results
 
