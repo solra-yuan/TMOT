@@ -145,3 +145,5 @@ flir_adas_v2_val_split: val_coco
 
 flir_adas_v2_thermal_train_split: train_coco_t
 flir_adas_v2_thermal_val_split: val_coco_t
+#Homography matrix
+thermal_to_rgb_H: [[8.53574165e-01, 2.22375667e-03, 3.89015344e+01], [9.72721717e-03, 8.07532479e-01, 3.99946901e+01],[2.60277679e-05, 9.73726838e-06, 1.00000000e+00]]

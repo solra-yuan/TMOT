@@ -22,7 +22,9 @@ from . import transforms as T
 
 from typing import Tuple
 from PIL import Image
-
+import cv2
+import numpy as np
+import matplotlib.pyplot as plt
 
 class CocoDetection(torchvision.datasets.CocoDetection):
 
@@ -31,7 +33,7 @@ class CocoDetection(torchvision.datasets.CocoDetection):
     def __init__(self,  img_folder, ann_file, transforms, norm_transforms: T.Compose,
                  return_masks=False, overflow_boxes=False, remove_no_obj_imgs=True,
                  prev_frame=False, prev_frame_rnd_augs=0.0, prev_prev_frame=False,
-                 min_num_objects=0):
+                 thermal_to_rgb_H=None, min_num_objects=0):
         super(CocoDetection, self).__init__(img_folder, ann_file)
         self._transforms = transforms
         self._norm_transforms = norm_transforms
@@ -50,6 +52,7 @@ class CocoDetection(torchvision.datasets.CocoDetection):
         self._prev_frame = prev_frame
         self._prev_frame_rnd_augs = prev_frame_rnd_augs
         self._prev_prev_frame = prev_prev_frame
+        self.H = np.array(thermal_to_rgb_H) if thermal_to_rgb_H else None
 
     def _getitem_from_id(
             self, 
@@ -72,7 +75,13 @@ class CocoDetection(torchvision.datasets.CocoDetection):
         target = {'image_id': image_id,
                   'annotations': target}
         img, target = self.prepare(img, target)
+        #Alignment with Homography matrix
+        if concat_size_tuple:
+            resized_img = img.resize(concat_size_tuple)
 
+        if self.H is not None:
+            img = cv2.warpPerspective(np.array(resized_img), self.H, concat_size_tuple)
+            img = Image.fromarray(cv2.cvtColor(img, cv2.COLOR_BGR2RGB))
         if 'track_ids' not in target: #@TODO : This seems not optimal
             target['track_ids'] = torch.arange(len(target['labels']))
 

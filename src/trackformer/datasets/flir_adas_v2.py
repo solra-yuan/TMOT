@@ -582,7 +582,8 @@ def build_flir_adas_v2_concat(image_set, args):
         remove_no_obj_imgs=False,
         prev_frame=args.tracking,
         prev_frame_rnd_augs=prev_frame_rnd_augs,
-        prev_prev_frame=args.track_prev_prev_frame
+        prev_prev_frame=args.track_prev_prev_frame,
+        thermal_to_rgb_H=args.thermal_to_rgb_H
     )
 
     # flir_adas_v2
