@@ -26,17 +26,13 @@ if data.get('images'):
         if img is None:
             print("이미지를 찾을 수 없습니다:", file_name)
         else:
-            # 해당 이미지에 대한 annotation만 처리
             for annotation in data.get('annotations', []):
                 if annotation.get('image_id') == image_info.get('id'):
                     bbox = annotation.get('bbox')
-                    segmentation = annotation.get('segmentation')
 
-                    # bbox: [x, y, width, height]
                     x, y, w, h = map(int, bbox)
                     cv2.rectangle(img, (x, y), (x + w, y + h), (0, 255, 0), 2)
 
 
-            # visdom은 이미지의 채널 순서가 (C, H, W)여야 함 (BGR -> RGB 변환)
             img_rgb = cv2.cvtColor(img, cv2.COLOR_BGR2RGB)
             viz.image(img_rgb.transpose(2, 0, 1), opts=dict(title=f"Image with BBox and Segmentation {file_name}"))
