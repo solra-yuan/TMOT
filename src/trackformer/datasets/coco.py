@@ -74,14 +74,9 @@ class CocoDetection(torchvision.datasets.CocoDetection):
         image_id = self.ids[image_id]
         target = {'image_id': image_id,
                   'annotations': target}
-        img, target = self.prepare(img, target)
-        #Alignment with Homography matrix
-        if concat_size_tuple:
-            resized_img = img.resize(concat_size_tuple)
+        img, target = self.prepare(img, target) # pt1, pt2 -> xywh
 
-        if self.H is not None:
-            img = cv2.warpPerspective(np.array(resized_img), self.H, concat_size_tuple)
-            img = Image.fromarray(cv2.cvtColor(img, cv2.COLOR_BGR2RGB))
+
         if 'track_ids' not in target: #@TODO : This seems not optimal
             target['track_ids'] = torch.arange(len(target['labels']))
 
@@ -101,10 +96,12 @@ class CocoDetection(torchvision.datasets.CocoDetection):
 
         if random_jitter:
             img, target = self._add_random_jitter(img, target)
-        if concat_size_tuple is not None:
+        if concat_size_tuple:
             concat_size_w, concat_size_h = concat_size_tuple
             img, target = T.resize(img, target, (concat_size_w, concat_size_h))
-
+        # Alignment with Homography matrix(src:Thermal>tgt:RGB)
+        if self.H is not None:
+            img = cv2.warpPerspective(np.array(img), self.H, concat_size_tuple)
         img, target = self._norm_transforms(img, target)
 
 
@@ -369,3 +366,17 @@ def build(image_set, args, mode='instances'):
         min_num_objects=args.coco_min_num_objects)
 
     return dataset
+
+
+def pil_to_cv(image: Image.Image) -> np.ndarray:
+    return cv2.cvtColor(np.array(image), cv2.COLOR_RGB2BGR)
+
+def draw_bbox(image: np.ndarray, bbox: tuple, color=(0, 255, 0), thickness=2) -> np.ndarray:
+    x1, y1, x2, y2 = bbox
+    return cv2.rectangle(image, (x1, y1), (x2, y2), color, thickness)
+
+def save_image(filename: str, image: np.ndarray) -> bool:
+    return cv2.imwrite(filename, image)
+
+def resize_image(image: np.ndarray, size: tuple) -> np.ndarray:
+    return cv2.resize(image, size, interpolation=cv2.INTER_LINEAR)
