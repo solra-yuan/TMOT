@@ -24,7 +24,6 @@ from typing import Tuple
 from PIL import Image
 import cv2
 import numpy as np
-import matplotlib.pyplot as plt
 
 class CocoDetection(torchvision.datasets.CocoDetection):
 
@@ -74,7 +73,7 @@ class CocoDetection(torchvision.datasets.CocoDetection):
         image_id = self.ids[image_id]
         target = {'image_id': image_id,
                   'annotations': target}
-        img, target = self.prepare(img, target) # pt1, pt2 -> xywh
+        img, target = self.prepare(img, target) # xywh -> x1y1x2y2
 
 
         if 'track_ids' not in target: #@TODO : This seems not optimal

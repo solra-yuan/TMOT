@@ -9,6 +9,7 @@ import torch.nn.functional as F
 import torchvision
 from torch import nn
 from torchvision.models._utils import IntermediateLayerGetter
+from .multi_input_intermediate_layer_getter import MultiInputIntermediateLayerGetter
 from torchvision.ops.feature_pyramid_network import (FeaturePyramidNetwork,
                                                      LastLevelMaxPool)
 
@@ -65,10 +66,15 @@ class BackboneBase(nn.Module):
             'layer2',
             'layer3',
             'layer4',
-            'conv_rgbt_to_latent',
+            'conv_rgbt_to_latent', #alpha-beta
             'rgbt_bn',
             'preprocess_latent_channel',
-            'conv_inplane_to_rgb'
+            'conv_inplane_to_rgb',
+            'process_rgb', #gamma
+            'process_t',
+            'process_rgb2',
+            'process_t2',
+            'fusion_inplane_to_rgb'
         ])
 
         for name, parameter in backbone.named_parameters():
@@ -76,27 +82,53 @@ class BackboneBase(nn.Module):
                 parameter.requires_grad_(False)
 
         if return_interm_layers:
+            # alpha, beta
+            # return_layers = {
+            #     "conv_inplane_to_rgb": "0",
+            #     "layer1": "1",
+            #     "layer2": "2",
+            #     "layer3": "3",
+            #     "layer4": "4"
+            # } 
+            # self.strides = [4, 8, 16, 32] ##???
+            # self.num_channels = [256, 512, 1024, 2048] ##???
             return_layers = {
-                "conv_inplane_to_rgb": "0",
+                "fusion_inplane_to_rgb": "0",
                 "layer1": "1",
                 "layer2": "2",
                 "layer3": "3",
                 "layer4": "4"
             }
-            self.strides = [4, 8, 16, 32]
-            self.num_channels = [256, 512, 1024, 2048]
+            self.strides = [4, 8, 16, 32] ##???
+            self.num_channels = [256, 512, 1024, 2048] ##???
         else:
+            # alpha, beta
+            # return_layers = {
+            #     "conv_inplane_to_rgb": "0",
+            #     'layer4': "1"
+            # } 
+            # self.strides = [32]
+            # self.num_channels = [2048]
+
+            # gamma
             return_layers = {
-                "conv_inplane_to_rgb": "0",
+                "fusion_inplane_to_rgb": "0",
                 'layer4': "1"
             }
-            self.strides = [32]
-            self.num_channels = [2048]
-            
-        self.body = IntermediateLayerGetter(
+            self.strides = [32]  ##???
+            self.num_channels = [2048] ##???
+        
+        # alpha, beta    
+        # self.body = IntermediateLayerGetter(
+        #     backbone,
+        #     return_layers=return_layers
+        # )
+
+        # gamma
+        self.body = MultiInputIntermediateLayerGetter(
             backbone,
             return_layers=return_layers
-        )
+        )       
 
     def forward(self, tensor_list: NestedTensor):
         xs = self.body(tensor_list.tensors)
