@@ -400,10 +400,19 @@ def train(args: Namespace) -> None:
         checkpoint_paths = [output_dir / 'checkpoint.pth']
 
         # VAL
-        if epoch == 1 or not epoch % args.val_interval:
+        if epoch == 1 or not epoch % args.val_interval or True:
+            vis_opts = visualizers['val']['example_results'].viz_opts
+            visualizers['val']['example_results'].viz_opts = {
+                'title': 'VAL EXAMPLE RESULTS',
+                'wdith': vis_opts['width'],
+                'height': vis_opts['height'],
+            }
+
             val_stats, _ = evaluate(
                 model, criterion, postprocessors, data_loader_val, device,
                 output_dir, visualizers['val'], args, epoch)
+            
+            visualizers['val']['example_results'].viz_opts = vis_opts
 
             checkpoint_paths = [output_dir / 'checkpoint.pth']
             # extra checkpoint before LR drop and every 100 epochs

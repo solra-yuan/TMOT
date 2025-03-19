@@ -12,14 +12,9 @@ from torchvision.ops.boxes import clip_boxes_to_image
 from visdom import Visdom
 from packaging.version import Version
 
-from .util.plot_utils import fig_to_numpy
 from mpl_toolkits.axes_grid1.inset_locator import inset_axes
-from .NormalizeHelper import NormalizeHelper
+from trackformer.util.plot_utils import fig_to_numpy
 from visdom_options import VisdomOptionSingleton
-from VisHelper import VisHelper
-
-logging.getLogger('visdom').setLevel(logging.CRITICAL)
-
 
 def get_hsv_color_map(lutsize: int):
     """
@@ -628,229 +623,86 @@ def process_and_visualize_boxes(
             cmap
         )
 
-def vis_results(
-    visualizer,
-    img,
-    result,
-    target,
-    tracking,
-    features
-):
-    t_channel = img[3,:,:]
-    t_channel = t_channel.cpu().detach().numpy() 
-    t_channel = np.expand_dims(t_channel, axis=0)
+class VisHelper:
+    def __init__(self):
+        pass
 
-    img = VisHelper.draw_results(
+    @staticmethod
+    def draw_results(
         img,
         result,
         target,
         tracking
-    )
+    ):
+        frame_prefixes = ['prev', 'prev_prev']
 
-    visualizer.plot(img)
+        inv_normalize = T.Normalize(
+          mean=[-0.485 / 0.229, -0.456 / 0.224, -0.406 / 0.255],
+            std=[1 / 0.229, 1 / 0.224, 1 / 0.255]
+        )
 
-    tensor = features[0].tensors[0]
+        img_groups, img_ids = prepare_images_and_ids(
+            target,
+            img,
+            frame_prefixes,
+            inv_normalize
+        )
 
-    per_channel_img = NormalizeHelper.per_channel(tensor)
-    visualizer.viz.images(
-        per_channel_img,
-        nrow=1,
-        opts={
-            'title': '4to3_per_channel',
-            'width': 1200, 
-            'height': 1200,
-        },
-        win='4to3_per_channel',
-    )
+        # img.shape=[3, H, W]
+        figure, axarr = setup_figure(img_groups)
+        num_track_queries = num_track_queries_with_id = 0
+        if tracking:
+            num_track_queries = len(target['track_query_boxes'])
+            num_track_queries_with_id = len(target['track_query_match_ids'])
+            track_ids = target['track_ids'][target['track_query_match_ids']]
+        # result['boxes'] 는 result수, 4 크기의 텐서. scores가 score no object 이상인 것만 keep!
+        keep = result['scores'].cpu() > result['scores_no_object'].cpu()
 
-    per_channel_img = np.concatenate(
-        (per_channel_img.cpu().detach().numpy(), t_channel), 
-        axis=0
-    )
+        cmap = get_hsv_color_map(len(keep))
 
-    per_channel_img = VisHelper.draw_results(
-        torch.from_numpy(per_channel_img),
-        result,
-        target,
-        tracking
-    )
+        axs = display_images(axarr, img_groups, img_ids)
+        # visualize prediction
+        # 현재 프레임의 예측박스와 클래스확률을 0번 서브플롯에 시각화
+        process_and_visualize_boxes(
+            axs[0],
+            keep,
+            result,
+            target,
+            tracking,
+            track_ids,
+            cmap
+        )
+        # @TODO: detailed explanation of query_keep
+        query_keep = keep
+        if tracking:
+            track_queries_mask = target['track_queries_mask'].to(
+                keep.device)  # @TODO: target['track_queries_mask']
+            query_keep = keep[track_queries_mask == 0]
 
-    visualizer.viz.images(
-        per_channel_img,
-        nrow=1,
-        opts={
-            'title': '4to3_per_channel_resutls',
-            'width': 1200, 
-            'height': 1200,
-        },
-        win='4to3_per_channel',
-    )
+        legend_handles = create_legend_handles(
+            target,
+            keep,
+            query_keep,
+            num_track_queries,
+            num_track_queries_with_id
+        )
+        axs[0].legend(handles=legend_handles)
 
+        # 이전 프레임의 예측 타겟 박스와 트랙을 3번 서브플롯에 시각화
+        # process_and_visualize_previous_boxes(axs[3:], target, tracking)
 
-    visualizer.viz.images(
-        NormalizeHelper.across_channels(tensor),
-        nrow=1,
-        opts={
-            'title': '4to3_across',
-            'width': 1200, 
-            'height': 1200,
-        },
-        win='4to3_across',
-    )
+        # visualize true
+        visualize_frame_targets(
+            axs,
+            target,
+            frame_prefixes=frame_prefixes,
+            tracking=tracking
+        )
 
+        plt.subplots_adjust(wspace=0.01, hspace=0.01)
+        plt.axis('off')
 
+        img = fig_to_numpy(figure).transpose(2, 0, 1)
+        plt.close()
 
-
-
-def build_visualizers(
-    args: dict,
-    train_loss_names: list
-):
-    """
-    build the visualizer that stores and manages the configuration during training/evaluation
-    parameters :
-        - args (dict)
-        - train_loss_names (list)
-    Returns : 
-        - dict : A dictionary containing the visualizer configurations for the specified keys 
-            Keys: 
-                - 'train' : Configuration dictionary used during the training phase.
-                    Keys:
-                        - 'iter_metrics'(LineVis)
-                        - 'epoch_metrics'(LineVis)
-                        - 'epoch_eval'(LineVis)
-                        - 'example_results'(ImgVis)
-                - 'val' : Configuration used during the validation phase
-                    Keys:
-                        - 'epoch_metrics'(LineVis)
-                        - 'epoch_eval'(LineVis)
-                        - 'example_results'(ImgVis)
-    """
-
-    visualizers = {}
-    visualizers['train'] = {}
-    visualizers['val'] = {}
-
-    if args.eval_only or args.no_vis or not args.vis_server:
-        return visualizers
-
-    env_name = str(args.output_dir).split('/')[-1]
-
-    vis_kwargs = {
-        'env': env_name,
-        'resume': args.resume and args.resume_vis,
-        'port': args.vis_port,
-        'server': args.vis_server
-    }
-
-    #
-    # METRICS
-    #
-
-    legend = ['loss']
-    legend.extend(train_loss_names)
-
-    # for i in range(len(train_loss_names)):
-    #     legend.append(f"{train_loss_names[i]}_unscaled")
-
-    legend.extend([
-        'class_error',
-        # 'loss',
-        # 'loss_bbox',
-        # 'loss_ce',
-        # 'loss_giou',
-        # 'loss_mask',
-        # 'loss_dice',
-        # 'cardinality_error_unscaled',
-        # 'loss_bbox_unscaled',
-        # 'loss_ce_unscaled',
-        # 'loss_giou_unscaled',
-        # 'loss_mask_unscaled',
-        # 'loss_dice_unscaled',
-        'lr',
-        'lr_backbone',
-        'iter_time'
-    ])
-
-    legend.extend([f'class_count_{i}' for i in range(20)]) #log class counts. #@TODO: make this adaptive to #class
-    legend.extend([f'class_bce_{i}' for i in range(20)]) #log class counts. #@TODO: make this adaptive to #class
-
-    opts = dict(
-        title="TRAIN METRICS ITERS",
-        xlabel='ITERS',
-        ylabel='METRICS',
-        width=1000,
-        height=500,
-        legend=legend
-    )
-
-    # TRAIN
-    visualizers['train']['iter_metrics'] = LineVis(opts, **vis_kwargs)
-
-    opts = copy.deepcopy(opts)
-    opts['title'] = "TRAIN METRICS EPOCHS"
-    opts['xlabel'] = "EPOCHS"
-    opts['legend'].remove('lr')
-    opts['legend'].remove('lr_backbone')
-    opts['legend'].remove('iter_time')
-    visualizers['train']['epoch_metrics'] = LineVis(opts, **vis_kwargs)
-
-    # VAL
-    opts = copy.deepcopy(opts)
-    opts['title'] = "VAL METRICS EPOCHS"
-    opts['xlabel'] = "EPOCHS"
-    visualizers['val']['epoch_metrics'] = LineVis(opts, **vis_kwargs)
-
-    #
-    # EVAL COCO
-    #
-
-    legend = [
-        'BBOX AP IoU=0.50:0.95',
-        'BBOX AP IoU=0.50',
-        'BBOX AP IoU=0.75',
-    ]
-
-    if args.masks:
-        legend.extend([
-            'MASK AP IoU=0.50:0.95',
-            'MASK AP IoU=0.50',
-            'MASK AP IoU=0.75'])
-
-    if args.tracking and args.tracking_eval:
-        legend.extend(['MOTA', 'IDF1'])
-
-    opts = dict(
-        title='TRAIN EVAL EPOCHS',
-        xlabel='EPOCHS',
-        ylabel='METRICS',
-        width=1000,
-        height=500,
-        legend=legend)
-
-    # TRAIN
-    visualizers['train']['epoch_eval'] = LineVis(opts, **vis_kwargs)
-
-    # VAL
-    opts = copy.deepcopy(opts)
-    opts['title'] = 'VAL EVAL EPOCHS'
-    visualizers['val']['epoch_eval'] = LineVis(opts, **vis_kwargs)
-
-    #
-    # EXAMPLE RESULTS
-    #
-
-    opts = dict(
-        title="TRAIN EXAMPLE RESULTS",
-        width=2500,
-        height=2500)
-
-    # TRAIN
-    visualizers['train']['example_results'] = ImgVis(opts, **vis_kwargs)
-
-    # VAL
-    opts = copy.deepcopy(opts)
-    opts['title'] = 'VAL EXAMPLE RESULTS'
-    visualizers['val']['example_results'] = ImgVis(opts, **vis_kwargs)
-
-    return visualizers
+        return img
