@@ -15,6 +15,7 @@ from packaging.version import Version
 from .util.plot_utils import fig_to_numpy
 from mpl_toolkits.axes_grid1.inset_locator import inset_axes
 from .NormalizeHelper import NormalizeHelper
+from visdom_options import VisdomOptionSingleton
 
 logging.getLogger('visdom').setLevel(logging.CRITICAL)
 
@@ -54,7 +55,9 @@ class BaseVis(object):
         self.win = win
         if env is None:
             env = 'main'
-        self.viz = Visdom(env=env, port=port, server=server)
+        
+        options = VisdomOptionSingleton(env=env, port=port, server=server)
+        self.viz = Visdom(**options.asdict())
         # if resume first plot should not update with replace
         self.removed = not resume
 
