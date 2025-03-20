@@ -85,9 +85,6 @@ class CustomResNet(nn.Module):
         self.inplanes = 64
         self.dilation = 1
 
-        # 하위 클래스에서 정의된 전처리 로직 호출
-        self.preprocessing_sequence()
-
         if replace_stride_with_dilation is None:
             replace_stride_with_dilation = [False, False, False]
         if len(replace_stride_with_dilation) != 3:
@@ -97,10 +94,6 @@ class CustomResNet(nn.Module):
             )
         self.groups = groups
         self.base_width = width_per_group
-        self.conv1 = nn.Conv2d(3, self.inplanes, kernel_size=7, stride=2, padding=3, bias=False)
-        self.bn1 = norm_layer(self.inplanes)
-        self.relu = nn.ReLU(inplace=True)
-        self.maxpool = nn.MaxPool2d(kernel_size=3, stride=2, padding=1)
         self.layer1 = self._make_layer(block, 64, layers[0])
         self.layer2 = self._make_layer(block, 128, layers[1], stride=2, dilate=replace_stride_with_dilation[0])
         self.layer3 = self._make_layer(block, 256, layers[2], stride=2, dilate=replace_stride_with_dilation[1])
@@ -187,10 +180,8 @@ class CustomResNet(nn.Module):
         반환값:
             Tensor: 네트워크를 통과한 출력 텐서.
         """
-        x = self.conv1(x)
-        x = self.bn1(x)
-        x = self.relu(x)
-        x = self.maxpool(x)
+
+        x = self.preprocessing_sequence(x)
 
         x = self.layer1(x)
         x = self.layer2(x)
@@ -215,15 +206,8 @@ class CustomResNet(nn.Module):
         """
         return self._forward_impl(x)
 
-    @abstractmethod
     def preprocessing_sequence(self):
-        """
-        데이터 전처리 로직을 정의하기 위한 추상 메서드.
-
-        이 메서드는 하위 클래스에서 구현되어야 하며, 네트워크에 입력되기 전 데이터를 처리하는 로직을 포함합니다.
-
-        주의:
-            이 메서드는 모든 하위 클래스에서 전처리 단계를 구현하도록 강제합니다.
-            초기화 단계의 최상단에 정의되어 전처리가 다른 레이어보다 먼저 실행되도록 보장합니다.
-        """
-        pass
+        x = self.conv1(x)
+        x = self.bn1(x)
+        x = self.relu(x)
+        x = self.maxpool(x)

@@ -68,13 +68,11 @@ class BackboneBase(nn.Module):
             'layer4',
             'conv_rgbt_to_latent', #alpha-beta
             'rgbt_bn',
-            'preprocess_latent_channel',
             'conv_inplane_to_rgb',
             'process_rgb', #gamma
             'process_t',
             'process_rgb2',
             'process_t2',
-            'fusion_inplane_to_rgb'
         ])
 
         for name, parameter in backbone.named_parameters():
@@ -93,12 +91,15 @@ class BackboneBase(nn.Module):
             # self.strides = [4, 8, 16, 32] ##???
             # self.num_channels = [256, 512, 1024, 2048] ##???
             return_layers = {
-                "fusion_inplane_to_rgb": "0",
-                "layer1": "1",
-                "layer2": "2",
-                "layer3": "3",
-                "layer4": "4"
+                "conv_rgbt_to_latent": "0",
+                "rgbt_maxpool": "1",
+                "conv_inplane_to_rgb": "2",
+                "layer1": "3",
+                "layer2": "4",
+                "layer3": "5",
+                "layer4": "6"
             }
+            
             self.strides = [4, 8, 16, 32] ##???
             self.num_channels = [256, 512, 1024, 2048] ##???
         else:
@@ -112,7 +113,6 @@ class BackboneBase(nn.Module):
 
             # gamma
             return_layers = {
-                "fusion_inplane_to_rgb": "0",
                 'layer4': "1"
             }
             self.strides = [32]  ##???

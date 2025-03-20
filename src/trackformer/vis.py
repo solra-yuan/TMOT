@@ -649,57 +649,6 @@ def vis_results(
 
     visualizer.plot(img)
 
-    tensor = features[0].tensors[0]
-
-    per_channel_img = NormalizeHelper.per_channel(tensor)
-    visualizer.viz.images(
-        per_channel_img,
-        nrow=1,
-        opts={
-            'title': '4to3_per_channel',
-            'width': 1200, 
-            'height': 1200,
-        },
-        win='4to3_per_channel',
-    )
-
-    per_channel_img = np.concatenate(
-        (per_channel_img.cpu().detach().numpy(), t_channel), 
-        axis=0
-    )
-
-    per_channel_img = VisHelper.draw_results(
-        torch.from_numpy(per_channel_img),
-        result,
-        target,
-        tracking
-    )
-
-    visualizer.viz.images(
-        per_channel_img,
-        nrow=1,
-        opts={
-            'title': '4to3_per_channel_resutls',
-            'width': 1200, 
-            'height': 1200,
-        },
-        win='4to3_per_channel',
-    )
-
-
-    visualizer.viz.images(
-        NormalizeHelper.across_channels(tensor),
-        nrow=1,
-        opts={
-            'title': '4to3_across',
-            'width': 1200, 
-            'height': 1200,
-        },
-        win='4to3_across',
-    )
-
-
-
 
 
 def build_visualizers(

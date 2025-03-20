@@ -5,6 +5,7 @@ import torch.nn.init as init
 from torch.hub import load_state_dict_from_url
 from typing import Type, Any, Callable, Union, List, Optional
 from torchvision.models.resnet import BasicBlock, Bottleneck, conv1x1
+from torchvision.utils import _log_api_usage_once
 from .CustomResNet import CustomResNet
 
 __all__ = ['ResNet', 'resnet18', 'resnet34', 'resnet50', 'resnet101',
@@ -23,26 +24,72 @@ model_urls = {
     'wide_resnet50_2': 'https://download.pytorch.org/models/wide_resnet50_2-95faca4d.pth',
     'wide_resnet101_2': 'https://download.pytorch.org/models/wide_resnet101_2-32ee1156.pth',
 }
+#############################################
+# 수정된 MultiKernelConvBlock
+#############################################
 
-class ResNet4Channel(CustomResNet):
+
+class MultiKernelConvBlock(nn.Module):
     """
-    4채널(RGBT) 입력을 처리할 수 있도록 ResNet을 확장한 클래스.
-
-    CustomResNet을 상속받아 4채널 입력 데이터를 처리하기 위해 전처리 로직과 네트워크를 정의했습니다.
-
-    주요 기능:
-        - RGBT 데이터를 처리하기 위한 초기 합성곱 레이어 추가.
-        - 입력 데이터를 3채널(RGB)로 변환하는 추가 레이어 정의.
-        - 기존 ResNet 모델 아키텍처와 호환 가능.
-
-    Attributes:
-        conv_rgbt_to_latent (nn.Conv2d): RGBT 데이터를 latent 공간으로 변환하는 합성곱 레이어.
-        rgbt_bn (nn.BatchNorm2d): RGBT 데이터 정규화를 위한 BatchNorm 레이어.
-        rgbt_relu (nn.ReLU): 활성화 함수.
-        rgbt_maxpool (nn.MaxPool2d): RGBT 데이터에 적용할 풀링 레이어.
-        preprocess_latent_channel (nn.Sequential): Bottleneck 블록을 활용한 전처리 계층.
-        conv_inplane_to_rgb (nn.Conv2d): 4채널 데이터를 3채널로 변환하는 레이어.
+    4채널 입력을 받아 아래 순서로 convolution을 수행:
+      - (11×11): 4 → 8, stride=stride, padding=5 → downsampling (1/2)
+      - (9×9):   8 → 16, stride=2, padding=4 → 추가 downsampling (1/2)
+      - (7×7):  16 → 32, stride=1, padding=3
+      - (5×5):  32 → 64, stride=1, padding=2
+      - (3×3):  64 → 128, stride=1, padding=1
+    최종 출력은 (batch, 128, H/4, W/4) 형태이며,
+    이후 conv_inplane_to_rgb에서 1×1 convolution을 통해 128채널 → 64채널로 변환합니다.
     """
+
+    def __init__(self, in_channels: int, stride: int = 2):
+        super(MultiKernelConvBlock, self).__init__()
+        self.conv11 = nn.Conv2d(
+            in_channels, 8, kernel_size=11, stride=stride, padding=5, bias=False)
+        self.bn11 = nn.BatchNorm2d(8)
+
+        # conv9: stride=2로 추가 downsampling
+        self.conv9 = nn.Conv2d(8, 16, kernel_size=9,
+                               stride=2, padding=4, bias=False)
+        self.bn9 = nn.BatchNorm2d(16)
+
+        self.conv7 = nn.Conv2d(16, 32, kernel_size=7,
+                               stride=1, padding=3, bias=False)
+        self.bn7 = nn.BatchNorm2d(32)
+
+        self.conv5 = nn.Conv2d(32, 64, kernel_size=5,
+                               stride=1, padding=2, bias=False)
+        self.bn5 = nn.BatchNorm2d(64)
+
+        self.conv3 = nn.Conv2d(64, 128, kernel_size=3,
+                               stride=1, padding=1, bias=False)
+        self.bn3 = nn.BatchNorm2d(128)
+
+        self.relu = nn.ReLU(inplace=True)
+
+    def forward(self, x):
+        x = self.relu(self.bn11(self.conv11(x)))
+        x = self.relu(self.bn9(self.conv9(x)))
+        x = self.relu(self.bn7(self.conv7(x)))
+        x = self.relu(self.bn5(self.conv5(x)))
+        x = self.relu(self.bn3(self.conv3(x)))
+        return x
+
+class ResNet4Channel(nn.Module):
+    """
+    4채널(RGBT) 입력을 처리하기 위해 ResNet을 확장한 클래스.
+
+    변경 사항:
+      - 기존 7*7 conv 대신, 수정된 multi-kernel conv block을 사용하여 4채널 입력을 latent feature로 변환.
+        사용되는 커널 크기 및 채널 변화:
+            (11*11): 4 → 8   (stride=stride로 downsampling, 예: 2)
+            (9*9):    8 → 16  (stride=2로 추가 downsampling)
+            (7*7):   16 → 32
+            (5*5):   32 → 64
+            (3*3):   64 → 128
+      - 이후 conv_inplane_to_rgb에서 1*1 conv를 사용하여 128채널을 64채널로 정합,
+        ResNet을 layer이 기대하는 64채널 입력을 제공합니다.
+    """
+
     def __init__(
         self,
         block: Type[Union[BasicBlock, Bottleneck]],
@@ -54,196 +101,165 @@ class ResNet4Channel(CustomResNet):
         replace_stride_with_dilation: Optional[List[bool]] = None,
         norm_layer: Optional[Callable[..., nn.Module]] = None
     ) -> None:
-        """
-        ResNet4Channel 클래스 초기화.
+        super().__init__()
+        _log_api_usage_once(self)
+        if norm_layer is None:
+            norm_layer = nn.BatchNorm2d
+        self._norm_layer = norm_layer
 
-        Args:
-            block (Type[Union[BasicBlock, Bottleneck]]): ResNet 블록 유형.
-            layers (List[int]): 각 레이어의 블록 수.
-            num_classes (int): 분류 클래스 수.
-            zero_init_residual (bool): 잔차 분기의 BatchNorm 레이어를 0으로 초기화할지 여부.
-            groups (int): 그룹화된 합성곱의 그룹 수.
-            width_per_group (int): 그룹당 너비.
-            replace_stride_with_dilation (Optional[List[bool]]): stride를 dilation으로 대체할지 여부.
-            norm_layer (Optional[Callable[..., nn.Module]]): 정규화 레이어.
-        """
-        super().__init__(
-            block,
-            layers,
-            num_classes,
-            zero_init_residual,
-            groups,
-            width_per_group,
-            replace_stride_with_dilation,
-            norm_layer
-        )
+        self.inplanes = 64
+        self.dilation = 1
 
-    def preprocessing_sequence(self):
-        """
-        4채널 입력 데이터를 처리하기 위한 전처리 단계 정의.
+        if replace_stride_with_dilation is None:
+            replace_stride_with_dilation = [False, False, False]
+        if len(replace_stride_with_dilation) != 3:
+            raise ValueError(
+                "replace_stride_with_dilation은 None 또는 "
+                f"3개의 요소를 포함한 리스트여야 합니다: {replace_stride_with_dilation}"
+            )
+        self.groups = groups
+        self.base_width = width_per_group
 
-        - RGBT 데이터를 latent 공간으로 변환.
-        - Bottleneck 블록을 통해 전처리.
-        - 4채널 데이터를 3채널(RGB)로 변환.
-        """
-        # alpha, beta
-        # self.conv_rgbt_to_latent = nn.Conv2d(
-        #     4,
-        #     self.inplanes,
-        #     kernel_size=3,
-        #     stride=1,
-        #     padding=1,
-        #     bias=False
-        # )
-        # self.rgbt_bn = nn.BatchNorm2d(self.inplanes)
-        # self.rgbt_relu = nn.ReLU(inplace=True)
-        # self.rgbt_maxpool = nn.MaxPool2d(kernel_size=3, stride=2, padding=1)
-        
-        # rgbt_downsample = nn.Sequential(
-        #     conv1x1(self.inplanes, 256, stride=1),
-        #     self._norm_layer(256)
-        # )
-        # self.preprocess_latent_channel = nn.Sequential(
-        #     Bottleneck(
-        #         self.inplanes, 64,
-        #         stride=1,
-        #         downsample=rgbt_downsample,
-        #         groups=1,
-        #         base_width=64,
-        #         dilation=1
-        #     )
-        # )
+        if norm_layer is None:
+            norm_layer = nn.BatchNorm2d
 
-        # self.conv_inplane_to_rgb = nn.Conv2d(
-        #     self.inplanes * 4, 3, kernel_size=3, stride=1, padding=1, bias=False)
-        
-        # gamma
-        self.process_rgb = nn.Sequential(
-                                nn.Conv2d(3, 
-                                    self.inplanes, 
-                                    kernel_size=3,
-                                    stride=1,
-                                    padding=1,
-                                ),
-                                nn.BatchNorm2d(self.inplanes),
-                                nn.ReLU(inplace=True),
-                                nn.Conv2d(self.inplanes, 
-                                    self.inplanes, 
-                                    kernel_size=3,
-                                    stride=1,
-                                    padding=1,
-                                ),
-                                nn.BatchNorm2d(self.inplanes),
-                                nn.ReLU(inplace=True)                                
-        )        
-        self.process_t = nn.Sequential(
-                                nn.Conv2d(1, 
-                                    self.inplanes, 
-                                    kernel_size=3,
-                                    stride=1,
-                                    padding=1,
-                                ),
-                                nn.BatchNorm2d(self.inplanes),
-                                nn.ReLU(inplace=True),
-                                nn.Conv2d(self.inplanes, 
-                                    self.inplanes, 
-                                    kernel_size=3,
-                                    stride=1,
-                                    padding=1,
-                                ),
-                                nn.BatchNorm2d(self.inplanes),
-                                nn.ReLU(inplace=True)                                
-        )#conv-bn-relu-conv-bn-relu
-        self.process_rgb2 = nn.Sequential(
-                                nn.Conv2d(self.inplanes*2, 
-                                    self.inplanes*2, 
-                                    kernel_size=3,
-                                    stride=1,
-                                    padding=1,
-                                ),
-                                nn.BatchNorm2d(self.inplanes*2),
-                                nn.ReLU(inplace=True),
-                                nn.Conv2d(self.inplanes*2, 
-                                    self.inplanes*2, 
-                                    kernel_size=3,
-                                    stride=1,
-                                    padding=1,
-                                ),
-                                nn.BatchNorm2d(self.inplanes*2),
-                                nn.ReLU(inplace=True)                                
-        )        
-        #conv-bn-relu-conv-bn-relu
-        self.process_t2 = nn.Sequential(
-                                nn.Conv2d(self.inplanes*2, 
-                                    self.inplanes*2, 
-                                    kernel_size=3,
-                                    stride=1,
-                                    padding=1,
-                                ),
-                                nn.BatchNorm2d(self.inplanes*2),
-                                nn.ReLU(inplace=True),
-                                nn.Conv2d(self.inplanes*2, 
-                                    self.inplanes*2, 
-                                    kernel_size=3,
-                                    stride=1,
-                                    padding=1,
-                                ),
-                                nn.BatchNorm2d(self.inplanes*2),
-                                nn.ReLU(inplace=True)                                
-        ) 
-        self.fusion_inplane_to_rgb = nn.Conv2d(
-            self.inplanes * 4, 
-            3, 
-            kernel_size=3, 
-            stride=1, 
-            padding=1, 
-            bias=False)
-        
-        def weight_init(m):
-            """Convolution, BatchNorm 등의 모듈에 대해 적절한 초기화를 적용하는 함수"""
+        # 4채널 입력을 수정된 multi-kernel conv block을 통해 latent feature로 변환
+        self.conv_rgbt_to_latent = MultiKernelConvBlock(4, stride=2)
+        # conv_rgbt_to_latent에서 conv11과 conv9의 downsampling으로 전체 해상도가 1/4 축소됨
+        self.rgbt_maxpool = nn.MaxPool2d(kernel_size=3, stride=2, padding=1)
+
+        # conv_inplane_to_rgb에서 1×1 conv를 통해 128채널을 64채널로 변환
+        self.conv_inplane_to_rgb = nn.Conv2d(
+            128, 64, kernel_size=1, stride=1, bias=False)
+
+        self.layer1 = self._make_layer(block, 64, layers[0])
+        self.layer2 = self._make_layer(
+            block, 128, layers[1], stride=2, dilate=replace_stride_with_dilation[0])
+        self.layer3 = self._make_layer(
+            block, 256, layers[2], stride=2, dilate=replace_stride_with_dilation[1])
+        self.layer4 = self._make_layer(
+            block, 512, layers[3], stride=2, dilate=replace_stride_with_dilation[2])
+        self.avgpool = nn.AdaptiveAvgPool2d((1, 1))
+        self.fc = nn.Linear(512 * block.expansion, num_classes)
+
+        # 가중치 초기화
+        for m in self.modules():
             if isinstance(m, nn.Conv2d):
-                init.kaiming_normal_(m.weight, mode="fan_out", nonlinearity="relu")
-                if m.bias is not None:
-                    init.zeros_(m.bias)
-            elif isinstance(m, nn.BatchNorm2d):
-                init.ones_(m.weight)  # BatchNorm의 scale 파라미터를 1로 설정
-                init.zeros_(m.bias)   # shift 파라미터는 0으로 설정
-        
-        self.process_rgb.apply(weight_init)
-        self.process_t.apply(weight_init)
-        self.process_rgb2.apply(weight_init)
-        self.process_t2.apply(weight_init)
-        self.fusion_inplane_to_rgb.apply(weight_init)
+                nn.init.kaiming_normal_(
+                    m.weight, mode="fan_out", nonlinearity="relu")
+            elif isinstance(m, (nn.BatchNorm2d, nn.GroupNorm)):
+                nn.init.constant_(m.weight, 1)
+                nn.init.constant_(m.bias, 0)
 
+        if zero_init_residual:
+            for m in self.modules():
+                if isinstance(m, Bottleneck) and m.bn3.weight is not None:
+                    # type: ignore[arg-type]
+                    nn.init.constant_(m.bn3.weight, 0)
+                elif isinstance(m, BasicBlock) and m.bn2.weight is not None:
+                    # type: ignore[arg-type]
+                    nn.init.constant_(m.bn2.weight, 0)
+
+    def _make_layer(
+        self,
+        block: Type[Union[BasicBlock, Bottleneck]],
+        planes: int,
+        blocks: int,
+        stride: int = 1,
+        dilate: bool = False,
+    ) -> nn.Sequential:
+        """
+        잔차 레이어를 생성합니다.
+
+        매개변수:
+            block (Type[Union[BasicBlock, Bottleneck]]): 블록 유형.
+            planes (int): 레이어의 출력 채널 수.
+            blocks (int): 레이어 내 블록 수.
+            stride (int): 첫 번째 블록의 stride 값.
+            dilate (bool): 합성곱에서 dilation을 사용할지 여부.
+
+        반환값:
+            nn.Sequential: 잔차 블록들의 연속적 컨테이너.
+        """
+        norm_layer = self._norm_layer
+        downsample = None
+        previous_dilation = self.dilation
+        if dilate:
+            self.dilation *= stride
+            stride = 1
+        if stride != 1 or self.inplanes != planes * block.expansion:
+            downsample = nn.Sequential(
+                conv1x1(self.inplanes, planes * block.expansion, stride),
+                norm_layer(planes * block.expansion),
+            )
+
+        layers = []
+        layers.append(
+            block(
+                self.inplanes, planes, stride, downsample, self.groups, self.base_width, previous_dilation, norm_layer
+            )
+        )
+        self.inplanes = planes * block.expansion
+        for _ in range(1, blocks):
+            layers.append(
+                block(
+                    self.inplanes,
+                    planes,
+                    groups=self.groups,
+                    base_width=self.base_width,
+                    dilation=self.dilation,
+                    norm_layer=norm_layer,
+                )
+            )
+
+        return nn.Sequential(*layers)
+
+    def preprocessing_sequence(self, x):
+        # x: (batch, 4, H, W) - RGBT 입력
+        # 1. 수정된 multi-kernel conv block을 통해 latent feature 추출 (출력: (batch, 128, H/4, W/4))
+        x = self.conv_rgbt_to_latent(x)
+        # 추가 downsampling → 해상도 축소 (예: (batch, 128, H/8, W/8))
+        x = self.rgbt_maxpool(x)
+
+        # 3. conv_inplane_to_rgb에서 1×1 conv로 128채널을 64채널로 정합
+        x = self.conv_inplane_to_rgb(x)
+
+    def _forward_impl(self, x: Tensor) -> Tensor:
+        """
+        내부 순전파 로직을 정의합니다.
+
+        매개변수:
+            x (Tensor): 입력 텐서, 형태 (N, C, H, W).
+
+        반환값:
+            Tensor: 네트워크를 통과한 출력 텐서.
+        """
+
+        x = self.preprocessing_sequence(x)
+
+        x = self.layer1(x)
+        x = self.layer2(x)
+        x = self.layer3(x)
+        x = self.layer4(x)
+
+        x = self.avgpool(x)
+        x = torch.flatten(x, 1)
+        x = self.fc(x)
+
+        return x
 
     def forward(self, x: Tensor) -> Tensor:
         """
-        네트워크의 순전파 로직.
+        네트워크의 순전파를 실행합니다.
 
-        Args:
-            x (Tensor): 입력 텐서, 형태 (N, 4, H, W).
+        매개변수:
+            x (Tensor): 입력 텐서, 형태 (N, C, H, W).
 
-        Returns:
+        반환값:
             Tensor: 네트워크를 통과한 출력 텐서.
         """
-        # alpha, beta
-        # x = self.conv_rgbt_to_latent(x)
-        # x = self.rgbt_bn(x)
-        # x = self.rgbt_relu(x)
-        # x = self.rgbt_maxpool(x)
-        # x = self.preprocess_latent_channel(x)
-        # x = self.conv_inplane_to_rgb(x)
+        return self._forward_impl(x)
 
-        # gamma
-        rgb_x = self.process_rgb(x[:,0:3,:,:]) # slice 0,1,2 is rgb
-        thermal_x = self.process_t(x[:,3:,:,:]) # thermal
-        # fusion 1
-        rgb_x2 = self.process_rgb2(torch.cat([rgb_x, thermal_x], dim=1)) # channelwise concatenation 
-        thermal_x2 = self.process_t2(torch.cat([rgb_x, thermal_x], dim=1)) # channelwise concatenation
-        # fusion 2
-        x = self.fusion_inplane_to_rgb(torch.cat([rgb_x2, thermal_x2], dim=1))
-
-        return super().forward(x)
 
 def _resnet_4_channel(
     arch: str,
@@ -272,6 +288,7 @@ def _resnet_4_channel(
                                               progress=progress)
         model.load_state_dict(state_dict, strict=False)
     return model
+
 
 def resnet50_4_channel(pretrained: bool = False, progress: bool = True, **kwargs: Any) -> ResNet4Channel:
     """
