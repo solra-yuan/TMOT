@@ -6,16 +6,36 @@ from typing import Dict, List
 
 import torch
 import torch.nn.functional as F
-import torchvision
 from torch import nn
 from torchvision.models._utils import IntermediateLayerGetter
 from .multi_input_intermediate_layer_getter import MultiInputIntermediateLayerGetter
 from torchvision.ops.feature_pyramid_network import (FeaturePyramidNetwork,
                                                      LastLevelMaxPool)
 
+from dataclasses import dataclass
+
 from ..util.misc import NestedTensor, is_main_process
-from .position_encoding import build_position_encoding
-from .resnet_alter import resnet50_4_channel
+from abc import ABC, abstractmethod
+
+
+@dataclass
+class BackboneOptions:
+    name: str
+    train_backbone: bool
+    return_interm_layers: bool
+    dilation: bool
+
+
+@dataclass
+class BackboneProperties(ABC):
+    strides: list
+    num_channels: list
+    layer_names: set
+    return_layers: dict
+
+    @abstractmethod
+    def __init__(self, options: BackboneOptions):
+        pass
 
 
 class FrozenBatchNorm2d(torch.nn.Module):
@@ -59,76 +79,26 @@ class FrozenBatchNorm2d(torch.nn.Module):
 
 class BackboneBase(nn.Module):
 
-    def __init__(self, backbone: nn.Module, train_backbone: bool,
-                 return_interm_layers: bool):
+    def __init__(
+        self,
+        backbone: nn.Module,
+        properties: BackboneProperties,
+        options: BackboneOptions
+    ):
         super().__init__()
-        layer_names = set([
-            'layer2',
-            'layer3',
-            'layer4',
-            'conv_rgbt_to_latent', #alpha-beta
-            'rgbt_bn',
-            'preprocess_latent_channel',
-            'conv_inplane_to_rgb',
-            'process_rgb', #gamma
-            'process_t',
-            'process_rgb2',
-            'process_t2',
-            'fusion_inplane_to_rgb'
-        ])
+
+        self.strides = properties.strides
+        self.num_channels = properties.num_channels
 
         for name, parameter in backbone.named_parameters():
-            if (not train_backbone or all(layer_name not in name for layer_name in layer_names)):
+            if (not options.train_backbone or all(layer_name not in name for layer_name in properties.layer_names)):
                 parameter.requires_grad_(False)
-
-        if return_interm_layers:
-            # alpha, beta
-            # return_layers = {
-            #     "conv_inplane_to_rgb": "0",
-            #     "layer1": "1",
-            #     "layer2": "2",
-            #     "layer3": "3",
-            #     "layer4": "4"
-            # } 
-            # self.strides = [4, 8, 16, 32] ##???
-            # self.num_channels = [256, 512, 1024, 2048] ##???
-            return_layers = {
-                "fusion_inplane_to_rgb": "0",
-                "layer1": "1",
-                "layer2": "2",
-                "layer3": "3",
-                "layer4": "4"
-            }
-            self.strides = [4, 8, 16, 32] ##???
-            self.num_channels = [256, 512, 1024, 2048] ##???
-        else:
-            # alpha, beta
-            # return_layers = {
-            #     "conv_inplane_to_rgb": "0",
-            #     'layer4': "1"
-            # } 
-            # self.strides = [32]
-            # self.num_channels = [2048]
-
-            # gamma
-            return_layers = {
-                "fusion_inplane_to_rgb": "0",
-                'layer4': "1"
-            }
-            self.strides = [32]  ##???
-            self.num_channels = [2048] ##???
-        
-        # alpha, beta    
-        # self.body = IntermediateLayerGetter(
-        #     backbone,
-        #     return_layers=return_layers
-        # )
 
         # gamma
         self.body = MultiInputIntermediateLayerGetter(
             backbone,
-            return_layers=return_layers
-        )       
+            return_layers=properties.return_layers
+        )
 
     def forward(self, tensor_list: NestedTensor):
         xs = self.body(tensor_list.tensors)
@@ -136,29 +106,38 @@ class BackboneBase(nn.Module):
         for name, x in xs.items():
             m = tensor_list.mask
             assert m is not None
-            mask = F.interpolate(m[None].float(), size=x.shape[-2:]).to(torch.bool)[0]
+            mask = F.interpolate(
+                m[None].float(), size=x.shape[-2:]).to(torch.bool)[0]
             out[name] = NestedTensor(x, mask)
         return out
 
 
 class Backbone(BackboneBase):
     """ResNet backbone with frozen BatchNorm."""
-    def __init__(self, name: str,
-                 train_backbone: bool,
-                 return_interm_layers: bool,
-                 dilation: bool):
+
+    def __init__(
+        self,
+        model: nn.Module,
+        properties: BackboneProperties,
+        options: BackboneOptions,
+    ):
+        replace_stride_with_dilation = [False, False, options.dilation]
+        pretrained = is_main_process()
         norm_layer = FrozenBatchNorm2d
-        if name == 'resnet50_4_channel':
-            backbone = resnet50_4_channel(
-                replace_stride_with_dilation=[False, False, dilation],
-                pretrained=is_main_process(), norm_layer=norm_layer)
-        else:
-            backbone = getattr(torchvision.models, name)(
-            replace_stride_with_dilation=[False, False, dilation],
-            pretrained=is_main_process(), norm_layer=norm_layer)
-        super().__init__(backbone, train_backbone,
-                         return_interm_layers)
-        if dilation:
+
+        backbone = model(
+            replace_stride_with_dilation=replace_stride_with_dilation,
+            pretrained=pretrained,
+            norm_layer=norm_layer
+        )
+
+        super().__init__(
+            backbone,
+            properties,
+            options,
+        )
+
+        if options.dilation:
             self.strides[-1] = self.strides[-1] // 2
 
 
@@ -178,15 +157,3 @@ class Joiner(nn.Sequential):
             pos.append(self[1](x).to(x.tensors.dtype))
 
         return out, pos
-
-
-def build_backbone(args):
-    position_embedding = build_position_encoding(args)
-    train_backbone = args.lr_backbone > 0
-    return_interm_layers = args.masks or (args.num_feature_levels > 1)
-    backbone = Backbone(args.backbone,
-                        train_backbone,
-                        return_interm_layers,
-                        args.dilation)
-    model = Joiner(backbone, position_embedding)
-    return model

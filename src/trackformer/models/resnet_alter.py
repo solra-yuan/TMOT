@@ -1,3 +1,4 @@
+from dataclasses import dataclass
 import torch
 from torch import Tensor
 import torch.nn as nn
@@ -5,7 +6,9 @@ import torch.nn.init as init
 from torch.hub import load_state_dict_from_url
 from typing import Type, Any, Callable, Union, List, Optional
 from torchvision.models.resnet import BasicBlock, Bottleneck, conv1x1
+from .backbone import BackboneProperties, BackboneOptions
 from .CustomResNet import CustomResNet
+
 
 __all__ = ['ResNet', 'resnet18', 'resnet34', 'resnet50', 'resnet101',
            'resnet152', 'resnext50_32x4d', 'resnext101_32x8d',
@@ -23,6 +26,44 @@ model_urls = {
     'wide_resnet50_2': 'https://download.pytorch.org/models/wide_resnet50_2-95faca4d.pth',
     'wide_resnet101_2': 'https://download.pytorch.org/models/wide_resnet101_2-32ee1156.pth',
 }
+
+
+@dataclass
+class ResNet4ChannelProperties(BackboneProperties):
+    def __init__(self, options: BackboneOptions):
+        self.layer_names = set([
+            'layer2',
+            'layer3',
+            'layer4',
+            'conv_rgbt_to_latent',  # alpha-beta
+            'rgbt_bn',
+            'preprocess_latent_channel',
+            'conv_inplane_to_rgb',
+            'process_rgb',  # gamma
+            'process_t',
+            'process_rgb2',
+            'process_t2',
+            'fusion_inplane_to_rgb'
+        ])
+
+        if options.return_interm_layers:
+            self.strides = [4, 8, 16, 32]
+            self.num_channels = [256, 512, 1024, 2048]
+            self.return_layers = {
+                "fusion_inplane_to_rgb": "0",
+                "layer1": "1",
+                "layer2": "2",
+                "layer3": "3",
+                "layer4": "4"
+            }
+        else:
+            self.strides = [32]
+            self.num_channels = [2048]
+            self.return_layers = {
+                "fusion_inplane_to_rgb": "0",
+                'layer4': "1"
+            }
+
 
 class ResNet4Channel(CustomResNet):
     """
@@ -43,6 +84,7 @@ class ResNet4Channel(CustomResNet):
         preprocess_latent_channel (nn.Sequential): Bottleneck 블록을 활용한 전처리 계층.
         conv_inplane_to_rgb (nn.Conv2d): 4채널 데이터를 3채널로 변환하는 레이어.
     """
+
     def __init__(
         self,
         block: Type[Union[BasicBlock, Bottleneck]],
@@ -98,7 +140,7 @@ class ResNet4Channel(CustomResNet):
         # self.rgbt_bn = nn.BatchNorm2d(self.inplanes)
         # self.rgbt_relu = nn.ReLU(inplace=True)
         # self.rgbt_maxpool = nn.MaxPool2d(kernel_size=3, stride=2, padding=1)
-        
+
         # rgbt_downsample = nn.Sequential(
         #     conv1x1(self.inplanes, 256, stride=1),
         #     self._norm_layer(256)
@@ -116,105 +158,105 @@ class ResNet4Channel(CustomResNet):
 
         # self.conv_inplane_to_rgb = nn.Conv2d(
         #     self.inplanes * 4, 3, kernel_size=3, stride=1, padding=1, bias=False)
-        
+
         # gamma
         self.process_rgb = nn.Sequential(
-                                nn.Conv2d(3, 
-                                    self.inplanes, 
-                                    kernel_size=3,
-                                    stride=1,
-                                    padding=1,
-                                ),
-                                nn.BatchNorm2d(self.inplanes),
-                                nn.ReLU(inplace=True),
-                                nn.Conv2d(self.inplanes, 
-                                    self.inplanes, 
-                                    kernel_size=3,
-                                    stride=1,
-                                    padding=1,
-                                ),
-                                nn.BatchNorm2d(self.inplanes),
-                                nn.ReLU(inplace=True)                                
-        )        
+            nn.Conv2d(3,
+                      self.inplanes,
+                      kernel_size=3,
+                      stride=1,
+                      padding=1,
+                      ),
+            nn.BatchNorm2d(self.inplanes),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(self.inplanes,
+                      self.inplanes,
+                      kernel_size=3,
+                      stride=1,
+                      padding=1,
+                      ),
+            nn.BatchNorm2d(self.inplanes),
+            nn.ReLU(inplace=True)
+        )
         self.process_t = nn.Sequential(
-                                nn.Conv2d(1, 
-                                    self.inplanes, 
-                                    kernel_size=3,
-                                    stride=1,
-                                    padding=1,
-                                ),
-                                nn.BatchNorm2d(self.inplanes),
-                                nn.ReLU(inplace=True),
-                                nn.Conv2d(self.inplanes, 
-                                    self.inplanes, 
-                                    kernel_size=3,
-                                    stride=1,
-                                    padding=1,
-                                ),
-                                nn.BatchNorm2d(self.inplanes),
-                                nn.ReLU(inplace=True)                                
-        )#conv-bn-relu-conv-bn-relu
+            nn.Conv2d(1,
+                      self.inplanes,
+                      kernel_size=3,
+                      stride=1,
+                      padding=1,
+                      ),
+            nn.BatchNorm2d(self.inplanes),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(self.inplanes,
+                      self.inplanes,
+                      kernel_size=3,
+                      stride=1,
+                      padding=1,
+                      ),
+            nn.BatchNorm2d(self.inplanes),
+            nn.ReLU(inplace=True)
+        )  # conv-bn-relu-conv-bn-relu
         self.process_rgb2 = nn.Sequential(
-                                nn.Conv2d(self.inplanes*2, 
-                                    self.inplanes*2, 
-                                    kernel_size=3,
-                                    stride=1,
-                                    padding=1,
-                                ),
-                                nn.BatchNorm2d(self.inplanes*2),
-                                nn.ReLU(inplace=True),
-                                nn.Conv2d(self.inplanes*2, 
-                                    self.inplanes*2, 
-                                    kernel_size=3,
-                                    stride=1,
-                                    padding=1,
-                                ),
-                                nn.BatchNorm2d(self.inplanes*2),
-                                nn.ReLU(inplace=True)                                
-        )        
-        #conv-bn-relu-conv-bn-relu
+            nn.Conv2d(self.inplanes*2,
+                      self.inplanes*2,
+                      kernel_size=3,
+                      stride=1,
+                      padding=1,
+                      ),
+            nn.BatchNorm2d(self.inplanes*2),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(self.inplanes*2,
+                      self.inplanes*2,
+                      kernel_size=3,
+                      stride=1,
+                      padding=1,
+                      ),
+            nn.BatchNorm2d(self.inplanes*2),
+            nn.ReLU(inplace=True)
+        )
+        # conv-bn-relu-conv-bn-relu
         self.process_t2 = nn.Sequential(
-                                nn.Conv2d(self.inplanes*2, 
-                                    self.inplanes*2, 
-                                    kernel_size=3,
-                                    stride=1,
-                                    padding=1,
-                                ),
-                                nn.BatchNorm2d(self.inplanes*2),
-                                nn.ReLU(inplace=True),
-                                nn.Conv2d(self.inplanes*2, 
-                                    self.inplanes*2, 
-                                    kernel_size=3,
-                                    stride=1,
-                                    padding=1,
-                                ),
-                                nn.BatchNorm2d(self.inplanes*2),
-                                nn.ReLU(inplace=True)                                
-        ) 
+            nn.Conv2d(self.inplanes*2,
+                      self.inplanes*2,
+                      kernel_size=3,
+                      stride=1,
+                      padding=1,
+                      ),
+            nn.BatchNorm2d(self.inplanes*2),
+            nn.ReLU(inplace=True),
+            nn.Conv2d(self.inplanes*2,
+                      self.inplanes*2,
+                      kernel_size=3,
+                      stride=1,
+                      padding=1,
+                      ),
+            nn.BatchNorm2d(self.inplanes*2),
+            nn.ReLU(inplace=True)
+        )
         self.fusion_inplane_to_rgb = nn.Conv2d(
-            self.inplanes * 4, 
-            3, 
-            kernel_size=3, 
-            stride=1, 
-            padding=1, 
+            self.inplanes * 4,
+            3,
+            kernel_size=3,
+            stride=1,
+            padding=1,
             bias=False)
-        
+
         def weight_init(m):
             """Convolution, BatchNorm 등의 모듈에 대해 적절한 초기화를 적용하는 함수"""
             if isinstance(m, nn.Conv2d):
-                init.kaiming_normal_(m.weight, mode="fan_out", nonlinearity="relu")
+                init.kaiming_normal_(
+                    m.weight, mode="fan_out", nonlinearity="relu")
                 if m.bias is not None:
                     init.zeros_(m.bias)
             elif isinstance(m, nn.BatchNorm2d):
                 init.ones_(m.weight)  # BatchNorm의 scale 파라미터를 1로 설정
                 init.zeros_(m.bias)   # shift 파라미터는 0으로 설정
-        
+
         self.process_rgb.apply(weight_init)
         self.process_t.apply(weight_init)
         self.process_rgb2.apply(weight_init)
         self.process_t2.apply(weight_init)
         self.fusion_inplane_to_rgb.apply(weight_init)
-
 
     def forward(self, x: Tensor) -> Tensor:
         """
@@ -235,15 +277,18 @@ class ResNet4Channel(CustomResNet):
         # x = self.conv_inplane_to_rgb(x)
 
         # gamma
-        rgb_x = self.process_rgb(x[:,0:3,:,:]) # slice 0,1,2 is rgb
-        thermal_x = self.process_t(x[:,3:,:,:]) # thermal
+        rgb_x = self.process_rgb(x[:, 0:3, :, :])  # slice 0,1,2 is rgb
+        thermal_x = self.process_t(x[:, 3:, :, :])  # thermal
         # fusion 1
-        rgb_x2 = self.process_rgb2(torch.cat([rgb_x, thermal_x], dim=1)) # channelwise concatenation 
-        thermal_x2 = self.process_t2(torch.cat([rgb_x, thermal_x], dim=1)) # channelwise concatenation
+        # channelwise concatenation
+        rgb_x2 = self.process_rgb2(torch.cat([rgb_x, thermal_x], dim=1))
+        # channelwise concatenation
+        thermal_x2 = self.process_t2(torch.cat([rgb_x, thermal_x], dim=1))
         # fusion 2
         x = self.fusion_inplane_to_rgb(torch.cat([rgb_x2, thermal_x2], dim=1))
 
         return super().forward(x)
+
 
 def _resnet_4_channel(
     arch: str,
@@ -272,6 +317,7 @@ def _resnet_4_channel(
                                               progress=progress)
         model.load_state_dict(state_dict, strict=False)
     return model
+
 
 def resnet50_4_channel(pretrained: bool = False, progress: bool = True, **kwargs: Any) -> ResNet4Channel:
     """
