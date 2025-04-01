@@ -703,31 +703,6 @@ def vis_results(
 
     visualizer.plot(img)
 
-    tensor = features[0].tensors[0]
-
-    visualizer.viz.images(
-        NormalizeHelper.per_channel(tensor),
-        nrow=1,
-        opts={
-            'title': '4to3_per_channel',
-            'width': 1200, 
-            'height': 1200,
-        },
-        win='4to3_per_channel',
-    )
-
-    visualizer.viz.images(
-        NormalizeHelper.across_channels(tensor),
-        nrow=1,
-        opts={
-            'title': '4to3_across',
-            'width': 1200, 
-            'height': 1200,
-        },
-        win='4to3_across',
-    )
-
-
 
 def build_visualizers(
     args: dict,

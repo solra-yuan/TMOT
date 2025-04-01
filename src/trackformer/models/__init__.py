@@ -1,7 +1,6 @@
 # Copyright (c) Facebook, Inc. and its affiliates. All Rights Reserved
 import torch
 
-from .backbone import build_backbone
 from .deformable_detr import DeformableDETR, DeformablePostProcess
 from .deformable_transformer import build_deforamble_transformer
 from .detr import DETR, PostProcess, SetCriterion
@@ -11,6 +10,27 @@ from .detr_segmentation import (DeformableDETRSegm, DeformableDETRSegmTracking,
 from .detr_tracking import DeformableDETRTracking, DETRTracking
 from .matcher import build_matcher
 from .transformer import build_transformer
+from .backbone import BackboneOptions, BackboneProperties, Joiner
+from .backbone_provider import BackboneProvider
+from .position_encoding import build_position_encoding
+
+from .resnet_alter import resnet50_4_channel, ResNet4ChannelProperties
+from .resnet50_4_channel_custom_stem import resnet50_4_channel_custom_stem, ResNet4ChannelCustomStemProperties
+
+def build_backbone_options(args):
+    return BackboneOptions(
+        name=args.backbone,
+        train_backbone=args.lr_backbone > 0,
+        return_interm_layers=args.masks or (args.num_feature_levels > 1),
+        dilation=args.dilation
+    )
+
+
+def build_backbone_properties(name, options):
+    if name == "resnet50_4_channel_custom_stem":
+        return ResNet4ChannelCustomStemProperties(options)
+    else:
+        return ResNet4ChannelProperties(options)
 
 # train_one_epoch loss_dict criterion.weight_dict leads to here
 def build_model(args):
@@ -31,8 +51,20 @@ def build_model(args):
     else:
         raise NotImplementedError
 
+    backbone_provider = BackboneProvider()
+    backbone_provider.register("resnet50_4_channel", resnet50_4_channel)
+    backbone_provider.register("resnet50_4_channel_custom_stem", resnet50_4_channel_custom_stem)
+    
     device = torch.device(args.device)
-    backbone = build_backbone(args)
+    
+    backbone_options = build_backbone_options(args)
+    backbone_properties = build_backbone_properties(args.backbone, backbone_options)
+
+    backbone = Joiner(
+        backbone_provider.get(args.backbone, backbone_properties, backbone_options), 
+        build_position_encoding(args)
+    )
+    
     matcher = build_matcher(args)
 
     detr_kwargs = {
