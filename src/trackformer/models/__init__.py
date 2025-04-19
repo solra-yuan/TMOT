@@ -51,11 +51,11 @@ def build_model(args):
     else:
         raise NotImplementedError
 
+    device = torch.device(args.device)
+ 
     backbone_provider = BackboneProvider()
     backbone_provider.register("resnet50_4_channel", resnet50_4_channel)
     backbone_provider.register("resnet50_4_channel_custom_stem", resnet50_4_channel_custom_stem)
-    
-    device = torch.device(args.device)
     
     backbone_options = build_backbone_options(args)
     backbone_properties = build_backbone_properties(args.backbone, backbone_options)
