@@ -16,13 +16,26 @@ parser = argparse.ArgumentParser(description='Argparse Example')
 parser.add_argument(
     '--path',
     type=str,
-    default=environ.get("DATA_PATH") or './src/coco_parser_custom.json',
+    default=environ.get("DATA_PATH") or './src/coco_parser_custom_copy.json',
     help='Dataset path'
 )
 
 
 args = parser.parse_args()
 
+frame_range_for_split = {
+    'train': {'start': 0.0, 'end': 0.8},
+    'val': {'start': 0.8, 'end': 1.0},
+    'test': {'start': 0.0, 'end': 1.0}
+}
+
+# load custom info json
+with open('./src/flir_adas_info.json') as f:
+    custom_seqs_info = json.load(f)
+
+CUSTOM_META_INFO = custom_seqs_info['meta']['dataset']
+rgb_seq_to_thermal_seq = {v['image']['name']: v['thermal']['name']
+                          for k, v in CUSTOM_META_INFO.items()}
 
 class CustomDatasetDict(TypedDict):
     """
@@ -47,7 +60,16 @@ class CustomDatasetDict(TypedDict):
     '''
         The root directory of the dataset.
     '''
-
+# Note: MOT format gt for each sequence is needed to tracking evaluation.
+# (although the model uses coco-style input during training)
+# when evaluating The tracking performance of trained model,
+# 3rd party Motmetrics library compares MOT format gt(not coco tracking style) for each sequence
+# to model's inference output.(e.g. one MOT GT file for video-BzZspxAweF8AnKhWK)
+# If don't have MOT GT file, the inference is done without calculating the MOT metrics.
+# But that is not desired when examining the model performance in detail.
+# for check how the inferencing work in detail, examine src/track.py to start tracking 
+# after training the model.
+MOT_FOR_TRACKING_EVAL = True 
 
 DATA_PARSE_LIST = [
     'flir_adas_v2',
@@ -55,8 +77,6 @@ DATA_PARSE_LIST = [
     'flir_adas_v2_small',
     'flir_adas_v2_thermal_small'
 ]
-
-VIS_THRESHOLD = 0.25
 
 # add custom sequence info here
 CUSTOM_SEQS_INFO_DICT = {}
@@ -67,9 +87,15 @@ for dataitem in DATA_PARSE_LIST:
                 'video-BzZspxAweF8AnKhWK': {'img_width': 1024, 'img_height': 1224, 'seq_length': 338},
                 'video-FkqCGijjAKpABetZZ': {'img_width': 1024, 'img_height': 1224, 'seq_length': 226},
                 'video-PGdt7pJChnKoJDt35': {'img_width': 1024, 'img_height': 1224, 'seq_length': 208},
-                'video-RMxN6a4CcCeLGu4tA': {'img_width': 768, 'img_height': 1024, 'seq_length': 1033}
+                'video-RMxN6a4CcCeLGu4tA': {'img_width': 768, 'img_height': 1024, 'seq_length': 1033},
+                'video-YnfPeH8i2uBWmsSd2': {'img_width': 1024, 'img_height': 1224, 'seq_length': 540},
+                'video-dvZBYnphN2BwdMKBc': {'img_width': 768, 'img_height': 1024, 'seq_length': 565}
             },
             'val_sequences': {
+                'video-BzZspxAweF8AnKhWK': {'img_width': 1024, 'img_height': 1224, 'seq_length': 338},
+                'video-FkqCGijjAKpABetZZ': {'img_width': 1024, 'img_height': 1224, 'seq_length': 226},
+                'video-PGdt7pJChnKoJDt35': {'img_width': 1024, 'img_height': 1224, 'seq_length': 208},
+                'video-RMxN6a4CcCeLGu4tA': {'img_width': 768, 'img_height': 1024, 'seq_length': 1033},
                 'video-YnfPeH8i2uBWmsSd2': {'img_width': 1024, 'img_height': 1224, 'seq_length': 540},
                 'video-dvZBYnphN2BwdMKBc': {'img_width': 768, 'img_height': 1024, 'seq_length': 565}
             },
@@ -85,8 +111,14 @@ for dataitem in DATA_PARSE_LIST:
                 'video-6tLtjdkv5K5BuhB37': {'img_width': 512, 'img_height': 640, 'seq_length': 226},
                 'video-vbrSzr4vFTm5QwuGH': {'img_width': 512, 'img_height': 640, 'seq_length': 208},
                 'video-ZAtDSNuZZjkZFvMAo': {'img_width': 512, 'img_height': 640, 'seq_length': 1033},
+                'video-ePoikf5LyTTfqchga': {'img_width': 512, 'img_height': 640, 'seq_length': 540},
+                'video-t3f7QC8hZr6zYXpEZ': {'img_width': 512, 'img_height': 640, 'seq_length': 565},
             },
             'val_sequences': {
+                'video-4FRnNpmSmwktFJKjg': {'img_width': 512, 'img_height': 640, 'seq_length': 338},
+                'video-6tLtjdkv5K5BuhB37': {'img_width': 512, 'img_height': 640, 'seq_length': 226},
+                'video-vbrSzr4vFTm5QwuGH': {'img_width': 512, 'img_height': 640, 'seq_length': 208},
+                'video-ZAtDSNuZZjkZFvMAo': {'img_width': 512, 'img_height': 640, 'seq_length': 1033},
                 'video-ePoikf5LyTTfqchga': {'img_width': 512, 'img_height': 640, 'seq_length': 540},
                 'video-t3f7QC8hZr6zYXpEZ': {'img_width': 512, 'img_height': 640, 'seq_length': 565},
             },
@@ -107,14 +139,12 @@ rgb_seq_to_thermal_seq = {
     'video-msNEBxJE5PPDqenBM': 'video-SCiKdG3MqZfiE292B'
 }
 
-
 if __name__ == '__main__':
     def generate_coco_flir(
         name: str,
         data_root: str,
-        save_root: str,
+        save_root: str, 
         is_thermal: bool = False,
-        frame_range: FrameRangeDict = {'start': 0.0, 'end': 1.0}
     ):
 
         if is_thermal:
@@ -122,45 +152,42 @@ if __name__ == '__main__':
             root_split = 'train_t'
         else:
             split_names_list = ['train_coco', 'val_coco', 'test_coco']
-            root_split = 'train'
+            root_split = 'train'            
 
         for splited_name in split_names_list:
+            data_split_phase = splited_name.split('_')[0]
             seqs_names_from_splited_name = "".join(
-                [splited_name.split('_')[0], '_sequences'])
+                [data_split_phase, '_sequences'])            
+
+            frame_range = frame_range_for_split[data_split_phase] 
 
             if is_thermal:
                 print('is_thermal')
                 print(name, seqs_names_from_splited_name)
                 print(CUSTOM_SEQS_INFO_DICT[name]
                       [seqs_names_from_splited_name])
-                generator = FlirThermalCocoGenerator(
-                    split_name=splited_name,
-                    seqs_names=CUSTOM_SEQS_INFO_DICT[name][seqs_names_from_splited_name],
-                    root_split=root_split,
-                    frame_range=frame_range,
-                    data_root=data_root,
-                    rgb_seq_to_thermal_seq=rgb_seq_to_thermal_seq,
-                    save_root=save_root
-                )
+                generator = FlirThermalCocoGenerator(split_name=splited_name,
+                                                     seqs_names=CUSTOM_SEQS_INFO_DICT[name][seqs_names_from_splited_name],
+                                                     root_split=root_split,
+                                                     frame_range=frame_range,
+                                                     data_root=data_root,
+                                                     rgb_seq_to_thermal_seq=rgb_seq_to_thermal_seq,
+                                                     save_root=save_root)
             else:
-                generator = FlirCocoGenerator(
-                    split_name=splited_name,
-                    seqs_names=CUSTOM_SEQS_INFO_DICT[name][seqs_names_from_splited_name],
-                    root_split=root_split,
-                    frame_range=frame_range,
-                    data_root=data_root,
-                    save_root=save_root,
-                )
-
+                generator = FlirCocoGenerator(split_name=splited_name,
+                                              seqs_names=CUSTOM_SEQS_INFO_DICT[name][seqs_names_from_splited_name],
+                                              root_split=root_split,
+                                              frame_range=frame_range,
+                                              data_root=data_root,
+                                              save_root=save_root)
+                                              
             generator.generate()
 
     with open(args.path) as f:
         parse_list: list[CustomDatasetDict] = json.load(f)
 
-    for payload in parse_list:
-        generate_coco_flir(
-            name=payload['name'],
-            data_root=payload['data_root'],
-            save_root=payload['save_root'],
-            is_thermal=payload['is_thermal'],
-        )
+    for payload in parse_list: 
+        generate_coco_flir(name=payload['name'],
+                           data_root=payload['data_root'],
+                           save_root=payload['save_root'],
+                           is_thermal=payload['is_thermal'])

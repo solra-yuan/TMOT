@@ -22,7 +22,8 @@ from . import transforms as T
 
 from typing import Tuple
 from PIL import Image
-
+import cv2
+import numpy as np
 
 class CocoDetection(torchvision.datasets.CocoDetection):
 
@@ -31,7 +32,7 @@ class CocoDetection(torchvision.datasets.CocoDetection):
     def __init__(self,  img_folder, ann_file, transforms, norm_transforms: T.Compose,
                  return_masks=False, overflow_boxes=False, remove_no_obj_imgs=True,
                  prev_frame=False, prev_frame_rnd_augs=0.0, prev_prev_frame=False,
-                 min_num_objects=0):
+                 thermal_to_rgb_H=None, min_num_objects=0):
         super(CocoDetection, self).__init__(img_folder, ann_file)
         self._transforms = transforms
         self._norm_transforms = norm_transforms
@@ -50,6 +51,7 @@ class CocoDetection(torchvision.datasets.CocoDetection):
         self._prev_frame = prev_frame
         self._prev_frame_rnd_augs = prev_frame_rnd_augs
         self._prev_prev_frame = prev_prev_frame
+        self.H = np.array(thermal_to_rgb_H) if thermal_to_rgb_H else None
 
     def _getitem_from_id(
             self, 
@@ -71,9 +73,10 @@ class CocoDetection(torchvision.datasets.CocoDetection):
         image_id = self.ids[image_id]
         target = {'image_id': image_id,
                   'annotations': target}
-        img, target = self.prepare(img, target)
+        img, target = self.prepare(img, target) # xywh -> x1y1x2y2
 
-        if 'track_ids' not in target:
+
+        if 'track_ids' not in target: #@TODO : This seems not optimal
             target['track_ids'] = torch.arange(len(target['labels']))
 
         if self._transforms is not None:
@@ -92,10 +95,12 @@ class CocoDetection(torchvision.datasets.CocoDetection):
 
         if random_jitter:
             img, target = self._add_random_jitter(img, target)
-        if concat_size_tuple is not None:
+        if concat_size_tuple:
             concat_size_w, concat_size_h = concat_size_tuple
             img, target = T.resize(img, target, (concat_size_w, concat_size_h))
-
+        # Alignment with Homography matrix(src:Thermal>tgt:RGB)
+        if self.H is not None:
+            img = cv2.warpPerspective(np.array(img), self.H, concat_size_tuple)
         img, target = self._norm_transforms(img, target)
 
 
@@ -360,3 +365,17 @@ def build(image_set, args, mode='instances'):
         min_num_objects=args.coco_min_num_objects)
 
     return dataset
+
+
+def pil_to_cv(image: Image.Image) -> np.ndarray:
+    return cv2.cvtColor(np.array(image), cv2.COLOR_RGB2BGR)
+
+def draw_bbox(image: np.ndarray, bbox: tuple, color=(0, 255, 0), thickness=2) -> np.ndarray:
+    x1, y1, x2, y2 = bbox
+    return cv2.rectangle(image, (x1, y1), (x2, y2), color, thickness)
+
+def save_image(filename: str, image: np.ndarray) -> bool:
+    return cv2.imwrite(filename, image)
+
+def resize_image(image: np.ndarray, size: tuple) -> np.ndarray:
+    return cv2.resize(image, size, interpolation=cv2.INTER_LINEAR)

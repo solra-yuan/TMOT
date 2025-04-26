@@ -8,6 +8,8 @@ from .mot17_sequence import MOT17Sequence
 from .mot20_sequence import MOT20Sequence
 from .mots20_sequence import MOTS20Sequence
 from .flir_adas_v2_sequence import FLIR_ADAS_V2_Sequence
+from .flir_adas_v2_concat_sequence import FLIR_ADAS_V2_CONCATSequence
+
 
 class MOT17Wrapper(Dataset):
     """A Wrapper for the MOT_Sequence class to return multiple sequences."""
@@ -92,6 +94,51 @@ class FLIR_ADAS_V2_Wrapper(Dataset):
 
     def __getitem__(self, idx: int):
         return self._data[idx]
+    
+class FLIR_ADAS_V2_CONCATWrapper(Dataset):
+    """A Wrapper for the flir_adas_v2_Sequence class to return multiple sequences."""
+
+    def __init__(self, split: str, dets: str, **kwargs) -> None:
+        """Initliazes all subset of the dataset.
+
+        Keyword arguments:
+        split -- the split of the dataset to use
+        kwargs -- kwargs for the MOT17Sequence dataset
+        """
+        train_sequences = [    
+                            'video-BzZspxAweF8AnKhWK_rgb_t', 
+                            'video-FkqCGijjAKpABetZZ_rgb_t', 
+                            'video-PGdt7pJChnKoJDt35_rgb_t', 
+                            'video-RMxN6a4CcCeLGu4tA_rgb_t', 
+                            'video-YnfPeH8i2uBWmsSd2_rgb_t', 
+                            'video-dvZBYnphN2BwdMKBc_rgb_t', 
+                          ]
+        test_sequences = [
+                            'video-hnbGXq3nNPjBbc7CL_rgb_t', 
+                            'video-msNEBxJE5PPDqenBM_rgb_t'
+                         ]
+
+        if split == "FLIR_ADAS_V2_CONCAT_TRAIN":
+            sequences = train_sequences
+        elif split == "FLIR_ADAS_V2_CONCAT_TEST":
+            sequences = test_sequences
+        elif split == "FLIR_ADAS_V2_CONCAT_ALL":
+            sequences = train_sequences + test_sequences
+            sequences = sorted(sequences)
+        elif f"{split}" in train_sequences + test_sequences:
+            sequences = [f"{split}"]
+        else:
+            raise NotImplementedError("FLIR_ADAS_v2 split not available.")
+
+        self._data = []
+        for seq in sequences:
+            self._data.append(FLIR_ADAS_V2_CONCATSequence(seq_name=seq, **kwargs))
+
+    def __len__(self) -> int:
+        return len(self._data)
+
+    def __getitem__(self, idx: int):
+        return self._data[idx]    
 
 class MOT20Wrapper(Dataset):
     """A Wrapper for the MOT_Sequence class to return multiple sequences."""

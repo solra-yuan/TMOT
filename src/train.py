@@ -118,6 +118,19 @@ ex.add_named_config('flir_adas_v2_crowdhuman',
 #     val_split=val_coco \
 #     epochs=1 \
 
+# # custom rgb-t data training
+# python src/train.py with \
+#     flir_adas_v2_concat \
+#     dataset=flir_adas_v2_concat
+#     deformable \
+#     multi_frame \
+#     tracking \
+#     output_dir=models/flir_adas_v2_deformable_multi_frame \
+#     resume=/app/TMOT/models/r50_deformable_detr_plus_iterative_bbox_refinement-checkpoint_hidden_dim_288.pth \
+#     train_split=train_coco \
+#     val_split=val_coco \
+#     epochs=30
+
 
 def train(args: Namespace) -> None:
     print(args)
@@ -130,7 +143,7 @@ def train(args: Namespace) -> None:
         args.num_workers = 0
 
     if args.tracking_eval == 'false':
-        args.tracking_eval = False
+        args.tracking_eval = True
 
     if not args.deformable:
         assert args.num_feature_levels == 1
@@ -376,6 +389,7 @@ def train(args: Namespace) -> None:
         if args.eval_train:
             random_transforms = data_loader_train.dataset._transforms
             data_loader_train.dataset._transforms = data_loader_val.dataset._transforms
+            print(f"eval train on {epoch}")
             evaluate(
                 model, criterion, postprocessors, data_loader_train, device,
                 output_dir, visualizers['train'], args, epoch)

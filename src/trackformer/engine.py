@@ -19,9 +19,62 @@ from .util import misc as utils
 from .util.box_ops import box_iou
 from .util.track_utils import evaluate_mot_accums
 from .vis import vis_results
+from .datasets.flir_adas_v2 import FLIR_ADAS_V2_concat
 
+def calculate_box_iou_for_track_queries(result, target):
+    track_query_match_ids = target['track_query_match_ids'].to(target['boxes'].device)
+
+    track_queries_iou, _ = box_iou(
+        target['boxes'][track_query_match_ids],
+        result['boxes'])
+
+    box_ids = [box_id
+        for box_id, (is_track_query, is_fals_pos_track_query)
+        in enumerate(zip(target['track_queries_mask'], target['track_queries_fal_pos_mask']))
+        if is_track_query and not is_fals_pos_track_query]
+
+    result['track_queries_with_id_iou'] = torch.diagonal(track_queries_iou[:, box_ids])
+    print()
 
 def make_results(outputs, targets, postprocessors, tracking, return_only_orig=True):
+    """
+    make result(e.g. bbox class etc.,)of current frame and previous image
+    bbox and track query box
+    (0,1) normalized output bbox and track_query_boxes are adjusted to fit original image size
+
+    results example for flir_adas_v2 data
+    - results(-> list of dict), each item contains information for a frame(and its previous frame(s))
+        keys
+        - class_scores
+        - scores
+        - scores_no_object
+        - labels
+        - boxes
+        - target(->dict) 
+            keys
+            - boxes
+            - labels
+            - image_id
+            - track_ids
+            - area
+            - iscrowd
+            - orig_size
+            - size
+            - labels_ignore
+            - area_ignore
+            - iscrowd_ignore
+            - boxes_ignore
+            - track_ids_ignore
+            _ prev_image
+            _ prev_target
+            _ track_query_match_ids
+            _ track_query_hs_embeds
+            _ track_query_boxes : prev_image의 예측 박스를 의미
+            _ track_queries_mask
+            _ track_queries_fal_pos_mask
+        - track_queries_with_id_iou
+
+    """
     target_sizes = torch.stack([t["size"] for t in targets], dim=0)
     orig_target_sizes = torch.stack([t["orig_size"] for t in targets], dim=0)
 
@@ -84,21 +137,7 @@ def make_results(outputs, targets, postprocessors, tracking, return_only_orig=Tr
                 target['prev_target']['size'].unsqueeze(dim=0))[0].cpu()
 
             if 'track_query_match_ids' in target and len(target['track_query_match_ids']):
-                print("target['boxes']", target['boxes'], "device", target['boxes'].device)
-                print("target['track_query_match_ids']", target['track_query_match_ids'], target['track_query_match_ids'].device)
-
-                track_query_match_ids = target['track_query_match_ids'].to(target['boxes'].device)
-
-                track_queries_iou, _ = box_iou(
-                    target['boxes'][track_query_match_ids],
-                    result['boxes'])
-
-                box_ids = [box_id
-                    for box_id, (is_track_query, is_fals_pos_track_query)
-                    in enumerate(zip(target['track_queries_mask'], target['track_queries_fal_pos_mask']))
-                    if is_track_query and not is_fals_pos_track_query]
-
-                result['track_queries_with_id_iou'] = torch.diagonal(track_queries_iou[:, box_ids])
+                calculate_box_iou_for_track_queries(result, target)
 
     return results_orig, results
 
@@ -120,6 +159,8 @@ def train_one_epoch(model: torch.nn.Module, criterion: torch.nn.Module, postproc
         debug=args.debug)
     metric_logger.add_meter('lr', utils.SmoothedValue(window_size=1, fmt='{value:.6f}'))
     metric_logger.add_meter('class_error', utils.SmoothedValue(window_size=1, fmt='{value:.2f}'))
+    # for i in range(20): #@TODO : make hardcoded #classes 20 adaptive to #class label
+    #     metric_logger.add_meter(f'class_count_{i}', utils.SmoothedValue(window_size=1, fmt='{value:.2f}'))
 
     for i, (samples, targets) in enumerate(metric_logger.log_every(data_loader, epoch)):
         samples = samples.to(device)
@@ -128,7 +169,7 @@ def train_one_epoch(model: torch.nn.Module, criterion: torch.nn.Module, postproc
         # in order to be able to modify targets inside the forward call we need
         # to pass it through as torch.nn.parallel.DistributedDataParallel only
         # passes copies
-        outputs, targets, *_ = model(samples, targets)
+        outputs, targets, features, *_ = model(samples, targets)
 
         loss_dict = criterion(outputs, targets)  # loss criterion(custom class(inherited by nn.Module)) defined in DETR
         weight_dict = criterion.weight_dict  # weight_dict item indicates 3 types of loss "types"' weight(ce, bbox, giou.)
@@ -136,14 +177,19 @@ def train_one_epoch(model: torch.nn.Module, criterion: torch.nn.Module, postproc
 
         # reduce losses over all GPUs for logging purposes
         loss_dict_reduced = utils.reduce_dict(loss_dict)
+        loss_dict_label_count = {k:v for k,v in loss_dict_reduced.items() if 'class_count' == k} 
+        class_bce = {k:v for k,v in loss_dict_reduced.items() if 'class_bce' in k} 
+        label_count = {k:v for k,v in loss_dict_label_count['class_count'].items()}
+        loss_dict_reduced = {k:v for k,v in loss_dict_reduced.items() if 'class_count' not in k}
+        
         loss_dict_reduced_unscaled = {
             f'{k}_unscaled': v for k, v in loss_dict_reduced.items()}
         loss_dict_reduced_scaled = {
             k: v * weight_dict[k] for k, v in loss_dict_reduced.items() if k in weight_dict}
         losses_reduced_scaled = sum(loss_dict_reduced_scaled.values())
-
+        '''@TODO: loss debug for item in loss_dict_reduced_scaled:
+        print(f"{item}, : {loss_dict_reduced_scaled[item]}")'''
         loss_value = losses_reduced_scaled.item()
-
         if not math.isfinite(loss_value):
             print(f"Loss is {loss_value}, stopping training")
             print(loss_dict_reduced)
@@ -161,6 +207,10 @@ def train_one_epoch(model: torch.nn.Module, criterion: torch.nn.Module, postproc
         metric_logger.update(class_error=loss_dict_reduced['class_error'])
         metric_logger.update(lr=optimizer.param_groups[0]["lr"],
                              lr_backbone=optimizer.param_groups[1]["lr"])
+        for k,v in label_count.items():
+            metric_logger.update(**{k:v})
+        for k,v in class_bce.items():
+            metric_logger.update(**{k:v})
 
         if visualizers and (i == 0 or not i % args.vis_and_log_interval):
             _, results = make_results(
@@ -171,7 +221,9 @@ def train_one_epoch(model: torch.nn.Module, criterion: torch.nn.Module, postproc
                 samples.unmasked_tensor(0),
                 results[0],
                 targets[0],
-                args.tracking)
+                args.tracking,
+                features
+            )
 
     # gather the stats from all processes
     metric_logger.synchronize_between_processes()
@@ -179,6 +231,17 @@ def train_one_epoch(model: torch.nn.Module, criterion: torch.nn.Module, postproc
 
     return {k: meter.global_avg for k, meter in metric_logger.meters.items()}
 
+
+def config_update(dataset_name, is_rgb_t, data_loader, obj_detector_model):
+    config_updates = {
+        'seed': None,
+        'dataset_name': dataset_name,
+        'frame_range': data_loader.dataset.frame_range,
+        'obj_detector_model': obj_detector_model}
+    if is_rgb_t:
+        thermal_dataset_name = [name + "_rgb_t" for name in config_updates['dataset_name']]
+        config_updates['dataset_name'] = thermal_dataset_name
+    return config_updates
 
 @torch.no_grad()
 def evaluate(model, criterion, postprocessors, data_loader, device,
@@ -209,13 +272,17 @@ def evaluate(model, criterion, postprocessors, data_loader, device,
         samples = samples.to(device)
         targets = [utils.nested_dict_to_device(t, device) for t in targets]
 
-        outputs, targets, *_ = model(samples, targets)
+        outputs, targets, features, *_ = model(samples, targets)
 
         loss_dict = criterion(outputs, targets)
         weight_dict = criterion.weight_dict
 
         # reduce losses over all GPUs for logging purposes
         loss_dict_reduced = utils.reduce_dict(loss_dict)
+        loss_dict_label_count = {k:v for k,v in loss_dict_reduced.items() if 'class_count' == k} #@TODO: configure why label count dict have 5 class_count items
+        label_count = {k:v for k,v in loss_dict_label_count['class_count'].items()}
+        loss_dict_reduced = {k:v for k,v in loss_dict_reduced.items() if 'class_count' not in k}
+        
         loss_dict_reduced_scaled = {k: v * weight_dict[k]
                                     for k, v in loss_dict_reduced.items() if k in weight_dict}
         loss_dict_reduced_unscaled = {f'{k}_unscaled': v
@@ -224,6 +291,8 @@ def evaluate(model, criterion, postprocessors, data_loader, device,
                              **loss_dict_reduced_scaled,
                              **loss_dict_reduced_unscaled)
         metric_logger.update(class_error=loss_dict_reduced['class_error'])
+        for k,v in label_count.items():
+            metric_logger.update(**{k:v})
 
         if visualizers and (i == 0 or not i % args.vis_and_log_interval):
             results_orig, results = make_results(
@@ -234,7 +303,9 @@ def evaluate(model, criterion, postprocessors, data_loader, device,
                 samples.unmasked_tensor(0),
                 results[0],
                 targets[0],
-                args.tracking)
+                args.tracking,
+                features
+            )
         else:
             results_orig, _ = make_results(outputs, targets, postprocessors, args.tracking)
 
@@ -297,7 +368,7 @@ def evaluate(model, criterion, postprocessors, data_loader, device,
         
         for i, seq in enumerate(seqs):
             rank = i % utils.get_world_size()
-            seqs_per_rank[rank].append(seq)                              
+            seqs_per_rank[rank].append(seq)    
 
         # only evaluate one seq in debug mode
         if args.debug:
@@ -322,11 +393,12 @@ def evaluate(model, criterion, postprocessors, data_loader, device,
             'post': postprocessors,
             'img_transform': args.img_transform}
 
-        config_updates = {
-            'seed': None,
-            'dataset_name': dataset_name,
-            'frame_range': data_loader.dataset.frame_range,
-            'obj_detector_model': obj_detector_model}
+        is_rgb_t = True if isinstance(data_loader.dataset, FLIR_ADAS_V2_concat) else False
+        config_updates = config_update(dataset_name, 
+                                       is_rgb_t, 
+                                       data_loader, 
+                                       obj_detector_model)
+
         run = ex.run(config_updates=config_updates)
 
         mot_accums = utils.all_gather(run.result)[:len(seqs)]
@@ -351,7 +423,7 @@ def evaluate(model, criterion, postprocessors, data_loader, device,
     # VIS
     if visualizers:
         vis_epoch = visualizers['epoch_metrics']
-        y_data = [stats[legend_name] for legend_name in vis_epoch.viz_opts['legend']]
+        y_data = [stats[legend_name] for legend_name in vis_epoch.viz_opts['legend'] if legend_name in stats]
 
         vis_epoch.plot(y_data, epoch)
 
