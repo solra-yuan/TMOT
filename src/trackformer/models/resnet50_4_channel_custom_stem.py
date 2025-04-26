@@ -249,7 +249,7 @@ class ResNet4ChannelCustomStem(nn.Module):
 
         return nn.Sequential(*layers)
 
-    def preprocessing_sequence(self, x):
+    def preprocessing_layer(self, x):
         # x: (batch, 4, H, W) - RGBT 입력
         # 1. 수정된 multi-kernel conv block을 통해 latent feature 추출 (출력: (batch, 128, H/4, W/4))
         x = self.conv_rgbt_to_latent(x)
@@ -258,6 +258,7 @@ class ResNet4ChannelCustomStem(nn.Module):
 
         # 3. conv_inplane_to_rgb에서 1*1 conv로 128채널을 64채널로 정합
         x = self.conv_inplane_to_rgb(x)
+        return x
 
     def _forward_impl(self, x: Tensor) -> Tensor:
         """
@@ -270,7 +271,7 @@ class ResNet4ChannelCustomStem(nn.Module):
             Tensor: 네트워크를 통과한 출력 텐서.
         """
 
-        x = self.preprocessing_sequence(x)
+        x = self.preprocessing_layer(x)
 
         x = self.layer1(x)
         x = self.layer2(x)

@@ -20,6 +20,8 @@ from trackformer.util.track_utils import (evaluate_mot_accums, get_mot_accum,
                                           interpolate_tracks, plot_sequence)
 import time
 
+from global_visdom import VisdomSingleton
+
 start = time.time()
 mm.lap.default_solver = 'lap'
 
@@ -32,7 +34,10 @@ ex.add_named_config('reid', 'cfgs/track_reid.yaml')
 def main(seed, dataset_name, obj_detect_checkpoint_file, tracker_cfg,
          write_images, output_dir, interpolate, verbose, load_results_dir,
          data_root_dir, generate_attention_maps, frame_range,
-         _config, _log, _run, obj_detector_model=None):
+         _config, _log, _run, obj_detector_model=None, env=None):
+    VisdomSingleton.get_instance({
+        "env": env if env is not None else "track",
+    })
     if write_images:
         assert output_dir is not None
 

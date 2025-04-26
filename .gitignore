@@ -25,3 +25,5 @@ src/trackformer/models/ops/temp*
 **.local
 .coverage
 coverage.xml
+
+output
