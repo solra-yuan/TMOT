@@ -105,10 +105,10 @@ def make_results(outputs, targets, postprocessors, tracking, return_only_orig=Tr
 
     if 'segm' in postprocessors:
         results_orig = postprocessors['segm'](
-            results_orig, outputs, orig_target_sizes, target_sizes)
+            results_orig, outputs, orig_target_sizes, target_sizes).detach().cpu()
         if not return_only_orig:
             results = postprocessors['segm'](
-                results, outputs, target_sizes, target_sizes)
+                results, outputs, target_sizes, target_sizes).detach().cpu()
 
     if results is None:
         return results_orig, results
@@ -118,23 +118,23 @@ def make_results(outputs, targets, postprocessors, tracking, return_only_orig=Tr
         target_size = target_sizes[i].unsqueeze(dim=0)
 
         result['target'] = {}
-        result['boxes'] = result['boxes'].cpu()
+        result['boxes'] = result['boxes'].detach().cpu()
 
         # revert boxes for visualization
         for key in ['boxes', 'track_query_boxes']:
             if key in target:
                 target[key] = postprocessors['bbox'].process_boxes(
-                    target[key], target_size)[0].cpu()
+                    target[key], target_size)[0].detach().cpu()
 
         if tracking and 'prev_target' in target:
             if 'prev_prev_target' in target:
                 target['prev_prev_target']['boxes'] = postprocessors['bbox'].process_boxes(
                     target['prev_prev_target']['boxes'],
-                    target['prev_prev_target']['size'].unsqueeze(dim=0))[0].cpu()
+                    target['prev_prev_target']['size'].unsqueeze(dim=0))[0].detach().cpu()
 
             target['prev_target']['boxes'] = postprocessors['bbox'].process_boxes(
                 target['prev_target']['boxes'],
-                target['prev_target']['size'].unsqueeze(dim=0))[0].cpu()
+                target['prev_target']['size'].unsqueeze(dim=0))[0].detach().cpu()
 
             if 'track_query_match_ids' in target and len(target['track_query_match_ids']):
                 calculate_box_iou_for_track_queries(result, target)
