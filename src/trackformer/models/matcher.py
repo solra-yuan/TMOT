@@ -61,6 +61,11 @@ class HungarianMatcher(nn.Module):
                 - index_j is the indices of the corresponding selected targets (in order)
             For each batch element, it holds:
                 len(index_i) = len(index_j) = min(num_queries, num_target_boxes)
+        
+        memo on linear_sum_assignment:
+            returns row_ind, col_ind : array
+            an array of row indices and one of corresponding column indices giving the optimal assignment.
+            The row indices will be sorted. and optimal cost can be computed as cost_matrix[row_ind, col_ind].sum().
         """
         batch_size, num_queries = outputs["pred_logits"].shape[:2]
 

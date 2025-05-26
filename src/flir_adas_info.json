@@ -1,0 +1,139 @@
+{
+    "data_root": "/mnt/y/Datasets/flir_adas_v2",
+    "meta": {
+        "dataset": {
+            "BzZspxAweF8AnKhWK": {
+                "seq_length": 338,
+                "image": {
+                    "name": "video-BzZspxAweF8AnKhWK",
+                    "img_width": 1024,
+                    "img_height": 1224
+                },
+                "thermal": {
+                    "name": "video-4FRnNpmSmwktFJKjg",
+                    "img_width": 512,
+                    "img_height": 640
+                }
+            },
+            "FkqCGijjAKpABetZZ": {
+                "seq_length": 226,
+                "image": {
+                    "name": "video-FkqCGijjAKpABetZZ",
+                    "img_width": 1024,
+                    "img_height": 1224
+                },
+                "thermal": {
+                    "name": "video-6tLtjdkv5K5BuhB37",
+                    "img_width": 512,
+                    "img_height": 640
+                }
+            },
+            "PGdt7pJChnKoJDt35": {
+                "seq_length": 208,
+                "image": {
+                    "name": "video-PGdt7pJChnKoJDt35",
+                    "img_width": 1024,
+                    "img_height": 1224
+                },
+                "thermal": {
+                    "name": "video-vbrSzr4vFTm5QwuGH",
+                    "img_width": 512,
+                    "img_height": 640
+                }
+            },
+            "YnfPeH8i2uBWmsSd2": {
+                "seq_length": 540,
+                "image": {
+                    "name": "video-YnfPeH8i2uBWmsSd2",
+                    "img_width": 1024,
+                    "img_height": 1224
+                },
+                "thermal": {
+                    "name": "video-ePoikf5LyTTfqchga",
+                    "img_width": 512,
+                    "img_height": 640
+                }
+            },
+            "RMxN6a4CcCeLGu4tA": {
+                "seq_length": 1033,
+                "image": {
+                    "name": "video-RMxN6a4CcCeLGu4tA",
+                    "img_width": 1024,
+                    "img_height": 1224
+                },
+                "thermal": {
+                    "name": "video-ZAtDSNuZZjkZFvMAo",
+                    "img_width": 512,
+                    "img_height": 640
+                }
+            },
+            "dvZBYnphN2BwdMKBc": {
+                "seq_length": 565,
+                "image": {
+                    "name": "video-dvZBYnphN2BwdMKBc",
+                    "img_width": 768,
+                    "img_height": 1024
+                },
+                "thermal": {
+                    "name": "video-t3f7QC8hZr6zYXpEZ",
+                    "img_width": 512,
+                    "img_height": 640
+                }
+            },
+            "hnbGXq3nNPjBbc7CL": {
+                "seq_length": 411,
+                "image": {
+                    "name": "video-hnbGXq3nNPjBbc7CL",
+                    "img_width": 1024,
+                    "img_height": 1224
+                },
+                "thermal": {
+                    "name": "video-5RSrbWYu9eokv5bvR",
+                    "img_width": 512,
+                    "img_height": 640
+                }
+            },
+            "msNEBxJE5PPDqenBM": {
+                "seq_length": 428,
+                "image": {
+                    "name": "video-msNEBxJE5PPDqenBM",
+                    "img_width": 1024,
+                    "img_height": 1224
+                },
+                "thermal": {
+                    "name": "video-SCiKdG3MqZfiE292B",
+                    "img_width": 512,
+                    "img_height": 640
+                }
+            }
+        }
+    },
+    "flir_adas_v2": {
+        "dataset": {
+            "train": [
+                "BzZspxAweF8AnKhWK",
+                "FkqCGijjAKpABetZZ",
+                "PGdt7pJChnKoJDt35",
+                "RMxN6a4CcCeLGu4tA",
+                "YnfPeH8i2uBWmsSd2",
+                "dvZBYnphN2BwdMKBc"
+            ],
+            "test": [
+                "msNEBxJE5PPDqenBM",
+                "hnbGXq3nNPjBbc7CL"
+            ]
+        }
+    },
+    "flir_adas_v2_small": {
+        "dataset": {
+            "train": [
+                "BzZspxAweF8AnKhWK",
+                "FkqCGijjAKpABetZZ"
+            ],
+            "test": [
+                "msNEBxJE5PPDqenBM",
+                "hnbGXq3nNPjBbc7CL"
+            ]
+        }
+    }
+}

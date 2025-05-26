@@ -13,6 +13,8 @@ from visdom import Visdom
 from packaging.version import Version
 
 from .util.plot_utils import fig_to_numpy
+from mpl_toolkits.axes_grid1.inset_locator import inset_axes
+from .NormalizeHelper import NormalizeHelper
 
 logging.getLogger('visdom').setLevel(logging.CRITICAL)
 
@@ -128,21 +130,21 @@ class ImgVis(BaseVis):
         self.viz.save([self.viz.env])
 
 
-def draw_text(ax, x, y, text, fontsize=10, bbox=dict(facecolor='white', alpha=0.5)):
+def draw_text(ax, x, y, text, fontsize=7, bbox=dict(facecolor='white', alpha=0.4, boxstyle="Square,pad=0.15")):
     ax.text(x, y, text, fontsize=fontsize, bbox=bbox)
 
 
-def draw_track_id(ax, x, y, track_id, fontsize=10, bbox=dict(facecolor='white', alpha=0.5)):
+def draw_track_id(ax, x, y, track_id, fontsize=7, bbox=dict(facecolor='white', alpha=0.4, boxstyle="Square,pad=0.15")):
     """Displays the tracking ID on the graphic."""
     draw_text(ax, x, y, f"track_id={track_id}", fontsize=fontsize,  bbox=bbox)
 
 
-def draw_label(ax, x, y, lable, fontsize=10, bbox=dict(facecolor='white', alpha=0.5)):
+def draw_label(ax, x, y, lable, fontsize=7, bbox=dict(facecolor='white', alpha=0.4, boxstyle="Square,pad=0.15")):
     """Displays the tracking ID on the graphic."""
     draw_text(ax, x, y+10,  f"lable={lable}", fontsize=fontsize, bbox=bbox)
 
 
-def draw_rectangle(ax, x1, y1, x2, y2, fill=False, color='green', linewidth=2):
+def draw_rectangle(ax, x1, y1, x2, y2, fill=False, color='green', linewidth=1.5):
     """Draws a rectangle on the graphic."""
     ax.add_patch(plt.Rectangle(
         (x1, y1),
@@ -150,7 +152,8 @@ def draw_rectangle(ax, x1, y1, x2, y2, fill=False, color='green', linewidth=2):
         y2 - y1,
         fill=fill,
         color=color,
-        linewidth=linewidth
+        linewidth=linewidth,
+        alpha=0.7
     ))
 
 
@@ -170,14 +173,16 @@ def draw_mask(ax, mask, cmap, alpha=0.5):
     ax.imshow(masked_mask, alpha=alpha, cmap=cmap)
 
 
-def vis_previous_frames(ax, frame_target, get_cmap):
+def vis_previous_frame_targets(ax, frame_target, get_cmap, color='pink'):
     """
-    Visualizes previous frames with tracking IDs, bounding boxes, and masks.
+    Visualizes previous frames gt tracking IDs, bounding boxes, and masks.
 
     Parameters:
     - ax: The matplotlib axes to draw on.
-    - frame_target: A dictionary containing 'track_ids', 'boxes', and optionally 'masks'.
+    - frame_target: previous image's target,
+        A dictionary containing 'track_ids', 'boxes', and optionally 'masks'.
     - get_cmap: A function that takes an index and returns a colormap.
+    - tracking: if tracking
     """
     for j, track_id in enumerate(frame_target['track_ids']):
         x1, y1, x2, y2 = frame_target['boxes'][j]
@@ -185,9 +190,9 @@ def vis_previous_frames(ax, frame_target, get_cmap):
             ax,
             x1,
             y1,
-            f"track_id: {track_id}\nlable: {frame_target['labels'][j]}"
+            f"{frame_target['labels'][j]},{track_id}" #class, track id
         )
-        draw_rectangle(ax, x1, y1, x2, y2)
+        draw_rectangle(ax, x1, y1, x2, y2, color=color)
 
         if 'masks' in frame_target:
             mask = frame_target['masks'][j].cpu().numpy()
@@ -195,6 +200,81 @@ def vis_previous_frames(ax, frame_target, get_cmap):
             cmap = get_cmap(j)
             draw_mask(ax, mask, cmap)
 
+
+def process_and_visualize_previous_boxes(
+    ax,
+    target,
+    tracking):
+    prop_i = 0
+    for box_id in range(len(target['track_query_boxes'])):
+        prop_i = process_and_visualize_previous_box(ax, box_id, prop_i, target, tracking)
+
+def process_and_visualize_previous_box(
+    ax,
+    box_id,
+    prop_i,
+    target,
+    tracking,
+):
+    rect_color = 'blue'
+    offset = 50
+    #class_id = logit_to_labels(target['track_query_logits'])
+    text = f"c"
+    result_boxes = clip_boxes_to_image(target['track_query_boxes'], target['size'])
+    x1, y1, x2, y2 = result_boxes[box_id]
+    if tracking:
+        if target['track_queries_fal_pos_mask'][box_id]:
+            rect_color='red'
+        elif target['track_queries_mask'][box_id]:
+            rect_color='blue'
+
+            text = "c,t"
+    draw_rectangle(ax, x1, y1, x2, y2, color=rect_color)
+    draw_text(ax, x1, y1 + offset, text)
+
+    return prop_i
+
+def vis_previous_detection(ax, target, tracking):
+    """visualizes track_query match track ids
+    이전 프레임 예측된 박스 시각화
+    이전 프레임에서 예측했던 박스가 이번 프레임에서도 유지되는 경우 잘 추적하는지 확인 
+    @TODO: 클래스, 트랙 id 시각화하고 다음 프레임에 예측 안되었으면 빨강으로
+    Parameters:
+        -ax: The matplotlib axes to draw on.
+        -target: current frame's target,
+        -tracking: if tracking is True
+    """
+    # for item in target['track_query_pred_logits']:
+    #     item
+    
+    # score : softmax score among all classes
+    prop_i = 0
+
+    if tracking:
+        for i in range(len(target['track_query_boxes'])):
+            x1, y1, x2, y2 = target['track_query_boxes'][i]
+            prob = target['track_query_logits'][i].sigmoid()
+            scores, label = prob.max(-1)
+            class_scores = torch.nn.functional.softmax(target['track_query_logits'][i])
+            class_score = class_scores[label]
+            text = f"{label}({float(class_score.cpu().detach()):0.2f})"
+            if target['track_queries_fal_pos_mask'][i]:
+                rect_color = 'yellow'
+            # draw blue box if track queries mask is true
+            elif target['track_queries_mask'][i]:
+                rect_color = 'blue'
+                # renew text if target track query is captured
+                # descript class, score(note scores are per class),
+                # @TODO: detailed explanation about visualizing tracking object
+                # track id(indexed by prop_i), result['track_queries_with_id_iou']
+                text = f"{label}({float(class_score.cpu().detach()):0.2f}),{target['track_query_match_ids'][prop_i]}"
+                prop_i += 1
+
+            draw_rectangle(ax, x1, y1, x2, y2, color=rect_color)
+            offset = 5
+            draw_text(ax, x1, y1 + offset, text)
+
+    
 
 def append_legend_handles_for_unmatched_track_queries(
     track_queries_fal_pos_mask,
@@ -277,6 +357,8 @@ def create_legend_handles(
     Returns:
         list: A list of legend handles.
     """
+    # @TODO: add explanation of track query and object query
+    # object queries ( num of true query_keep / (all=false+true) box predicted by model-num_track_queries_with_id)
     legend_handles = [
         mpatches.Patch(
             color='green',
@@ -311,7 +393,7 @@ def create_legend_handles(
     return legend_handles
 
 
-def visualize_frame_targets(axarr, target, frame_prefixes=['prev', 'prev_prev']):
+def visualize_frame_targets(axarr, target, frame_prefixes=['prev', 'prev_prev'], tracking=None):
     """
     Visualizes the tracking information for previous frames.
 
@@ -321,9 +403,17 @@ def visualize_frame_targets(axarr, target, frame_prefixes=['prev', 'prev_prev'])
     - frame_prefixes: A list of frame prefixes to visualize.
     """
     # Initialize the index for subplot axes.
-    i = 1
-
+    i = 1  # 3 column image, middle column은 target column
+    num_track_ids = len(target['track_ids'])
+    get_cmap = get_hsv_color_map(num_track_ids)
+    vis_previous_frame_targets(axarr[i], target, get_cmap, color='pink')
+    
+    # 이전 프레임의 예측 시각화 @TODO: 정답 시각화에서 예측 시각화 분리
+    # vis_previous_detection(axarr[i], target, tracking)
+    i = 3
     for frame_prefix in frame_prefixes:
+
+        i = i+1
         # Check if the target contains the target information for the current frame prefix.
         if f'{frame_prefix}_target' not in target:
             continue
@@ -332,111 +422,97 @@ def visualize_frame_targets(axarr, target, frame_prefixes=['prev', 'prev_prev'])
         num_track_ids = len(frame_target['track_ids'])
 
         get_cmap = get_hsv_color_map(num_track_ids)
-
-        vis_previous_frames(axarr[i], frame_target, get_cmap)
-        i += 1
+        # 이전 프레임의 gt 타겟 박스와 gt track 시각화
+        vis_previous_frame_targets(axarr[i], frame_target, get_cmap, color='pink')
+        i += 2
+    
+    
+    
 
 
 def prepare_images_and_ids(target, img, frame_prefixes, inv_normalize):
-    imgs = [inv_normalize(img).cpu()]
+    img_groups = [[inv_normalize(img[:3]).cpu(), img[3:].cpu()]]
     img_ids = [target['image_id'].item()]
-
+    # previous or prev_previous img is appended in img_groups.
+    # img_ids and second (prev_image) id might not be consecutive or might be in reversed order, 
+    # but objects in the images can overlap.
     for key in frame_prefixes:
         if f'{key}_image' in target:
-            imgs.append(inv_normalize(target[f'{key}_image']).cpu())
+            img_groups.append(
+                [inv_normalize(target[f'{key}_image'][:3]).cpu(), img[3:].cpu()])
             img_ids.append(target[f'{key}_target'][f'image_id'].item())
+    return img_groups, img_ids
 
-    return imgs, img_ids
 
-
-def setup_figure(imgs, dpi=96):
-    figure, axarr = plt.subplots(len(imgs))
+def setup_figure(img_groups, dpi=96):
+    figure, axarr = plt.subplots(len(img_groups))
     figure.tight_layout()
     figure.set_dpi(dpi)
     figure.set_size_inches(
-        imgs[0].shape[2] / dpi,
-        imgs[0].shape[1] * len(imgs) / dpi
+        img_groups[0][0].shape[2] * 2 / dpi,
+        img_groups[0][0].shape[1] * len(img_groups) / dpi
     )
 
-    if len(imgs) == 1:
+    if len(img_groups) == 1:
         axarr = [axarr]
 
     return figure, axarr
 
 
-def display_images(axarr, imgs, img_ids):
-    for ax, img, img_id in zip(axarr, imgs, img_ids):
+def display_images(axarr, img_groups, img_ids):
+    axs = []
+    for ax, img_group, img_id in zip(axarr, img_groups, img_ids):
         ax.set_axis_off()
-        ax.imshow(img.permute(1, 2, 0).clamp(0, 1))
 
-        draw_text(ax, 0, 0, f'IMG_ID={img_id}')
-
-
-def process_detection_box(
-    ax,
-    box_id,
-    result,
-    target,
-    tracking,
-    track_ids,
-    cmap
-):
-    rect_color = 'green'
-    offset = 0
-    scores_text = f"{result['scores'][box_id]:0.2f}"
-
-    if tracking:
-        if target['track_queries_fal_pos_mask'][box_id]:
-            rect_color = 'red'
-        elif target['track_queries_mask'][box_id]:
-            offset = 50
-            rect_color = 'blue'
-            scores_text = (
-                f"{track_ids[box_id]}\n"
-                f"{scores_text}\n"
-                f"{result['track_queries_with_id_iou'][box_id]:0.2f}"
-            )
-
-    result_boxes = clip_boxes_to_image(
-        result['boxes'],
-        target['size']
-    )
-    x1, y1, x2, y2 = result_boxes[box_id]
-
-    draw_rectangle(ax, x1, y1, x2, y2, color=rect_color)
-    draw_text(ax, x1, y1 + offset, scores_text)
-
-    if 'masks' in result:
-        mask = result['masks'][box_id][0].numpy()
-        draw_mask(ax, mask, cmap=colors.ListedColormap([cmap(box_id)]))
-
-
-def process_all_detection_boxes(
-    axarr,
-    result,
-    target,
-    tracking,
-    track_ids,
-    keep
-):
-    cmap = get_hsv_color_map(len(keep))
-
-    # np.nonzero(keep) returns indices of True elements
-    for box_id in np.nonzero(keep)[0]:
-        process_detection_box(
-            axarr[0],
-            box_id,
-            result,
-            target,
-            tracking,
-            track_ids,
-            cmap
+        # Left: RGB Image
+        ax1 = inset_axes(
+            ax,
+            width="33%",
+            height="100%",
+            loc='center left',
+            borderpad=0
         )
+        ax1.imshow(img_group[0].permute(1, 2, 0).clamp(0, 1))
+        ax1.set_axis_off()
 
+        # Middle: Thermal Image
+        ax2 = inset_axes(
+            ax,
+            width="33%",
+            height="100%",
+            loc='center',
+            borderpad=0
+        )
+        ax2.imshow(img_group[0].permute(1, 2, 0).clamp(0, 1))
+        ax2.set_axis_off()
+
+        # Right: Additional Image (e.g., Depth)
+        ax3 = inset_axes(
+            ax,
+            width="33%",
+            height="100%",
+            loc='center right',
+            borderpad=0
+        )
+        ax3.imshow(img_group[1].squeeze(), cmap='gray')
+        ax3.set_axis_off()
+
+        # Add text label to the first image (RGB)
+        draw_text(ax1, 0, 20, f'IMG_ID={img_id}')
+
+        # Append to list
+        axs.append(ax1)
+        axs.append(ax2)
+        axs.append(ax3)
+    # Reduce subplot spacing
+    plt.subplots_adjust(wspace=0, hspace=0)
+
+    return axs
 
 def process_and_visualize_box(
     ax,
     box_id,
+    prop_i,
     keep,
     result,
     target,
@@ -450,6 +526,7 @@ def process_and_visualize_box(
     Args:
         ax (matplotlib.axes.Axes): The Axes object to draw the visuals on.
         box_id (int): The index of the current bounding box.
+        prop_i @TODO: detailed explanation
         keep (numpy.ndarray): An array indicating which boxes to keep.
         result (dict): The result dictionary containing 'scores', 'boxes', and optionally 'masks'.
         target (dict): The target dictionary containing tracking information.
@@ -460,14 +537,37 @@ def process_and_visualize_box(
     Returns:
         None
     """
-    if not keep[box_id]:
-        return
-
+    #track_queries_fal_pos_mask (len: all predicted boxes) false positive-> red
+    # 1) object query - 초기 컬러는 green 색을 가짐
     rect_color = 'red' if tracking and target['track_queries_fal_pos_mask'][box_id] else 'green'
     offset = 50 if tracking and target['track_queries_mask'][box_id] else 0
-    class_id = result['labels'][box_id]
-    text = f"class: {class_id}({result['class_scores'][box_id][class_id]:0.2f})\n" + \
-        f"track: {track_ids[box_id]}" if tracking else f"{result['scores'][box_id]:0.2f}"
+    class_id = result['labels'][box_id] # class_id : classification prediction
+    text = f"cls: {class_id}({result['scores'][box_id]:0.2f})" # descript current box class and score
+    # 모든 track query를 시각화한다.
+    if tracking:
+        # 2) false positive track queries
+        if target['track_queries_fal_pos_mask'][box_id]:
+            rect_color = 'red'
+        # 3) track query
+        elif target['track_queries_mask'][box_id]:
+            rect_color = 'blue'
+            # renew text if target track query is captured
+            # descript class, score(note scores are per class),
+            # @TODO: detailed explanation about visualizing tracking object
+            # true positive track id(indexed by prop_i), result['track_queries_with_id_iou']
+            text = f"{class_id}({result['class_scores'][box_id][class_id]:0.2f}),{track_ids[prop_i]}({result['track_queries_with_id_iou'][prop_i]:0.2f})"
+            prop_i += 1
+
+    if not keep[box_id]:
+        # 4) 3) 중 keep 점수가 낮아 탈락한 false negative
+        # 트랙 쿼리에 대해 모델이 물체 가능성이 낮다고 점수를 준 경우 
+        # (keep[box_id]가 False) 물체가 아닌 것으로 판단하였다.
+        # False negative 모델에 의해 track으로 탐지는 되었지만 keep 점수가 낮았던 물체를 보라으로 표시
+        if target['track_queries_mask'][box_id]==False:
+            return prop_i
+        elif tracking and target['track_queries_mask'][box_id]==True:
+            rect_color = 'purple' #출력 텍스트는 위에 계산한 정보를 그대로 가져온다.
+        # @TODO: FN 오브젝트 쿼리를 표시 
 
     result_boxes = clip_boxes_to_image(result['boxes'], target['size'])
     x1, y1, x2, y2 = result_boxes[box_id]
@@ -478,6 +578,8 @@ def process_and_visualize_box(
     if 'masks' in result:
         mask = result['masks'][box_id][0].numpy()
         draw_mask(ax, mask, cmap=colors.ListedColormap([cmap(box_id)]))
+
+    return prop_i
 
 
 def process_and_visualize_boxes(
@@ -507,10 +609,11 @@ def process_and_visualize_boxes(
 
     # Counter for the property index, used when tracking is enabled
     prop_i = 0
-
+    # 모든 쿼리를 순회하며 예측 박스를 시각화한다.
     for box_id in range(len(keep)):
-        process_and_visualize_box(
+        prop_i = process_and_visualize_box(
             ax,
+            box_id,
             prop_i,
             keep,
             result,
@@ -520,17 +623,13 @@ def process_and_visualize_boxes(
             cmap
         )
 
-        if tracking and target['track_queries_mask'][box_id]:
-            # Increment property index for tracked boxes
-            prop_i += 1
-
-
 def vis_results(
     visualizer,
     img,
     result,
     target,
-    tracking
+    tracking,
+    features
 ):
     frame_prefixes = ['prev', 'prev_prev']
 
@@ -539,7 +638,7 @@ def vis_results(
         std=[1 / 0.229, 1 / 0.224, 1 / 0.255]
     )
 
-    imgs, img_ids = prepare_images_and_ids(
+    img_groups, img_ids = prepare_images_and_ids(
         target,
         img,
         frame_prefixes,
@@ -547,21 +646,22 @@ def vis_results(
     )
 
     # img.shape=[3, H, W]
-    figure, axarr = setup_figure(imgs)
-    display_images(axarr, imgs, img_ids)
-
+    figure, axarr = setup_figure(img_groups)
     num_track_queries = num_track_queries_with_id = 0
     if tracking:
         num_track_queries = len(target['track_query_boxes'])
         num_track_queries_with_id = len(target['track_query_match_ids'])
         track_ids = target['track_ids'][target['track_query_match_ids']]
-
+    # result['boxes'] 는 result수, 4 크기의 텐서. scores가 score no object 이상인 것만 keep!
     keep = result['scores'].cpu() > result['scores_no_object'].cpu()
 
     cmap = get_hsv_color_map(len(keep))
 
+    axs = display_images(axarr, img_groups, img_ids)
+    # visualize prediction
+    # 현재 프레임의 예측박스와 클래스확률을 0번 서브플롯에 시각화
     process_and_visualize_boxes(
-        axarr[0],
+        axs[0],
         keep,
         result,
         target,
@@ -569,10 +669,10 @@ def vis_results(
         track_ids,
         cmap
     )
-
+    # @TODO: detailed explanation of query_keep
     query_keep = keep
     if tracking:
-        track_queries_mask = target['track_queries_mask'].to(keep.device)
+        track_queries_mask = target['track_queries_mask'].to(keep.device) # @TODO: target['track_queries_mask']
         query_keep = keep[track_queries_mask == 0]
 
     legend_handles = create_legend_handles(
@@ -582,12 +682,17 @@ def vis_results(
         num_track_queries,
         num_track_queries_with_id
     )
-    axarr[0].legend(handles=legend_handles)
+    axs[0].legend(handles=legend_handles)
 
+    # 이전 프레임의 예측 타겟 박스와 트랙을 3번 서브플롯에 시각화
+    # process_and_visualize_previous_boxes(axs[3:], target, tracking)
+
+    # visualize true
     visualize_frame_targets(
-        axarr,
+        axs,
         target,
-        frame_prefixes=frame_prefixes
+        frame_prefixes=frame_prefixes,
+        tracking=tracking
     )
 
     plt.subplots_adjust(wspace=0.01, hspace=0.01)
@@ -668,6 +773,9 @@ def build_visualizers(
         'lr_backbone',
         'iter_time'
     ])
+
+    legend.extend([f'class_count_{i}' for i in range(20)]) #log class counts. #@TODO: make this adaptive to #class
+    legend.extend([f'class_bce_{i}' for i in range(20)]) #log class counts. #@TODO: make this adaptive to #class
 
     opts = dict(
         title="TRAIN METRICS ITERS",

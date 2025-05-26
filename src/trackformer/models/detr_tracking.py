@@ -37,6 +37,54 @@ class DETRTrackingBase(nn.Module):
         self._tracking = True
 
     def add_track_queries_to_targets(self, targets, prev_indices, prev_out, add_false_pos=True):
+        '''
+        description
+            이전 프레임의 예측된 트랙 아이디와 현재 프레임의 타겟의 트랙 아이디가 일치하는지 확인하고
+            프레임을 거쳐 유지된 트랙의 정보(이전 프레임의 예측된 트랙값, 해당 트랙의 박스, emb 외 정보)
+            를 현재 타겟에 추가해 줌
+        
+        inputs
+            -targets: 현재 샘플 배치의 각 타겟 변수가 담긴 리스트 
+            -prev_indices: prev_output_without_aux(prev_out에서 aux 부분 제외)과 
+                prev_targets를 Matcher에 입력 후 리턴받은 값, 
+                prev image로부터 나온 예측값을 prev_target과 Hungarian matching수행함
+                예측값에서의 sorted된 인덱스(row idx)와 타겟값에서의 최소비용매칭 인덱스 (col idx)를를
+                배치 단위로 입력 및 리턴 받음.
+            -prev_out: 현재 타겟의 "prev_image"를 DETR model로 설정된 모델 클래스의 forward 함수에 입력 후,
+                리턴값 중 첫 번째 인자
+                keys:
+                    - pred_logits
+                    - pred_boxes
+                    - hs_embed
+                    - aux_outputs (model.aux_loss=True일 떄)
+                    - enc_outputs (model.two_stage=True일 때)
+
+            -add_false_pos: optional, false positive 
+        
+        타겟에 추가하는 키 정보
+            - track_query_match_ids : 
+                이전 프레임의 예측된 트랙 아이디와 현재 프레임의 정답 타겟 아이디를 비교하여 일치하는 트랙 아이디  
+                (target_ind_matched_idx)
+            - track_query_hs_embeds : 
+                현재 프레임에도 유지되는 track id의 이전 프레임에서 예측된 hs_embed 값
+                prev_out['hs_embed'][i, prev_out_ind]
+            - track_query_boxes :
+                현재 프레임에도 유지되는 track id의 이전 프레임의 예측된 pred_boxes
+                prev_out['pred_boxes'][i, prev_out_ind].detach()
+            - track_query_logits :
+                현재 프레임에도 유지되는 track id의 이전 프레임의 예측 로짓
+            - track_queries_mask : 
+                트랙 쿼리 마스크
+                torch.cat([
+                    track_queries_mask,
+                    torch.tensor([False, ] * self.num_queries).to(device)
+                ]).bool()
+            - track_queries_fal_pos_mask :
+                = torch.cat([
+                    track_queries_fal_pos_mask,
+                    torch.tensor([False, ] * self.num_queries).to(device)
+                ]).bool()
+        '''
         device = prev_out['pred_boxes'].device
 
         # for i, (target, prev_ind) in enumerate(zip(targets, prev_indices)):
@@ -182,6 +230,8 @@ class DETRTrackingBase(nn.Module):
                 torch.tensor([False, ] * self.num_queries).to(device)
             ]).bool()
 
+            target['track_query_logits'] = prev_out['pred_logits'][i, prev_out_ind].detach()
+
         # add placeholder track queries to allow for batch sizes > 1
         # max_track_query_hs_embeds = max([len(t['track_query_hs_embeds']) for t in targets])
         # for i, target in enumerate(targets):
@@ -217,8 +267,13 @@ class DETRTrackingBase(nn.Module):
         #     target['track_queries_placeholder_mask'][:num_add] = True
 
     def forward(self, samples: NestedTensor, targets: list = None, prev_features=None):
-        if targets is not None and not self._tracking:
-            prev_targets = [target['prev_target'] for target in targets]
+        '''
+        prev_image를 DETR 모델로 이미지 단위로 box, class set prediction
+        matcher에 넣어서 prev target의 box, class와 매칭 인덱스 획득
+        prev_image로부터의 최종 예측값을 현재 타겟 정보에 저장
+        '''
+        if targets is not None and not self._tracking: # 우측: _tracking이 아닐 때만 # @TODO: 이전프레임이 현재프레임과 동일한 경우 발생하는 것 해결
+            prev_targets = [target['prev_target'] for target in targets] # target['prev_target']: 데이터 
 
             # if self.training and random.uniform(0, 1) < 0.5:
             if self.training:
@@ -259,6 +314,7 @@ class DETRTrackingBase(nn.Module):
                     prev_indices = self._matcher(prev_outputs_without_aux, prev_targets)
 
                     self.add_track_queries_to_targets(targets, prev_indices, prev_out)
+
             else:
                 # if not training we do not add track queries and evaluate detection performance only.
                 # tracking performance is evaluated by the actual tracking evaluation.

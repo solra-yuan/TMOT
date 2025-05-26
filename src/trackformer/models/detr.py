@@ -252,7 +252,6 @@ class SetCriterion(nn.Module):
         target_classes_onehot.scatter_(2, target_classes.unsqueeze(-1), 1)
 
         target_classes_onehot = target_classes_onehot[:, :, :-1]
-
         # query_mask = None
         # if self.tracking:
         #     query_mask = torch.stack([~t['track_queries_placeholder_mask'] for t in targets])[..., None]
@@ -279,7 +278,6 @@ class SetCriterion(nn.Module):
             # TODO this should probably be a separate loss, not hacked in this one here
             losses['class_error'] = 100 - \
                 accuracy(src_logits[idx], target_classes_o)[0]
-
         # compute seperate track and object query losses
         # loss_ce = sigmoid_focal_loss(
         #     src_logits, target_classes_onehot, num_boxes,
@@ -300,6 +298,51 @@ class SetCriterion(nn.Module):
         # losses['loss_ce_object_queries'] = loss_ce[idx][~track_query_target_masks].mean(1).sum() / num_boxes
 
         return losses
+
+    @torch.no_grad()
+    def labels_count(self, outputs, targets, indices, num_boxes, log=True):
+            """label count, does not propagate any loss(just for logging purpose)"""
+            assert 'pred_logits' in outputs
+            target_classes_o = torch.cat([
+                t["labels"][J] for t, (_, J) in zip(targets, indices)]
+            )
+            #target class item count
+            target_classes_count = {f'class_count_{k}':0 for k in range(20)}
+            for i in target_classes_o:
+                if f"class_count_{i.item()}" in target_classes_count:
+                    target_classes_count[f"class_count_{i.item()}"] += 1        
+                else:
+                    AssertionError(f'{i.item()} should be key of labels_count. Make sure # class is equal to 20.')
+
+            losses = {'class_count': target_classes_count}
+
+            return losses
+    
+    @torch.no_grad()
+    def class_conditional_binary_crossentropy(self, outputs, targets, indices, num_boxes, log=True):
+        """returns class conditional binary_crossentropy list. only for logging, propagates no losses"""
+        assert 'pred_logits' in outputs
+        src_logits = outputs['pred_logits']
+
+        idx = self._get_src_permutation_idx(indices)
+        target_classes_o = torch.cat([
+            t["labels"][J] for t, (_, J) in zip(targets, indices)]
+        )
+        target_classes = torch.full(src_logits.shape[:2], self.num_classes,
+                                    dtype=torch.int64, device=src_logits.device)
+        target_classes[idx] = target_classes_o
+
+        target_classes_length=src_logits.shape[2]
+        sum_class_conditional_bce = {f'class_bce_{k}':0 for k in range(target_classes_length)}
+        
+        # batch sum of binary crossentropy, per class        
+        prob = src_logits.sigmoid()
+        # store sum of binary crossentropy loss
+        # without negative probability loss(cause gt label prob=1.0)        
+        for b,s,c in zip(idx[0], idx[1], target_classes_o):
+            sum_class_conditional_bce[f'class_bce_{c.item()}'] += torch.log(prob[b][s][c])
+
+        return sum_class_conditional_bce
 
     @torch.no_grad()
     def loss_cardinality(self, outputs, targets, indices, num_boxes):
@@ -418,6 +461,8 @@ class SetCriterion(nn.Module):
             'cardinality': self.loss_cardinality,
             'boxes': self.loss_boxes,
             'masks': self.loss_masks,
+            'counts': self.labels_count,
+            'class_bce': self.class_conditional_binary_crossentropy
         }
         assert loss in loss_map, f'do you really want to compute {loss} loss?'
         return loss_map[loss](outputs, targets, indices, num_boxes, **kwargs)
@@ -433,7 +478,12 @@ class SetCriterion(nn.Module):
         outputs_without_aux = {
             k: v for k, v in outputs.items() if k != 'aux_outputs'
         }
-
+        '''
+        @TODO: loss and metric check
+        for i in outputs_without_aux:
+            print(f'key:{i}, type:{[type(output_item) for output_item in outputs_without_aux[i]]}, shape:{[output_item.shape for output_item in outputs_without_aux[i] if type(output_item)==torch.Tensor]}')
+            print(outputs_without_aux[i])
+        '''
         # Retrieve the matching between the outputs of the last layer and the targets
         indices = self.matcher(outputs_without_aux, targets)
 
@@ -458,8 +508,9 @@ class SetCriterion(nn.Module):
             for i, aux_outputs in enumerate(outputs['aux_outputs']):
                 indices = self.matcher(aux_outputs, targets)
                 for loss in self.losses:
-                    if loss == 'masks':
+                    if loss == 'masks' or loss =='class_count' or 'class_bce' in loss:
                         # Intermediate masks losses are too costly to compute, we ignore them.
+                        # class_count and class_bces are for logging, so we don't compute auxiliary loss for them.
                         continue
                     kwargs = {}
                     if loss == 'labels':

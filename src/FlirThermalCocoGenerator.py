@@ -14,6 +14,7 @@ class FlirThermalCocoGenerator(AbstractCocoGenerator):
         rgb_seq_to_thermal_seq: dict[str, str],
         gt_file_name: str = 'coco_gt_t/coco.json',
         dataset_base_path: Optional[str] = None,
+        mot_for_tracking_eval = True        
     ):
         super().__init__(
             split_name=split_name,
@@ -23,7 +24,8 @@ class FlirThermalCocoGenerator(AbstractCocoGenerator):
             data_root=data_root,
             save_root=save_root,
             dataset_base_path=dataset_base_path,
-            gt_file_name=gt_file_name
+            gt_file_name=gt_file_name,
+            mot_for_tracking_eval = mot_for_tracking_eval
         )
         self.rgb_seq_to_thermal_seq = rgb_seq_to_thermal_seq
 

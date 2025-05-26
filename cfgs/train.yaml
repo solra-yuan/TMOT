@@ -6,7 +6,7 @@ lr_linear_proj_mult: 0.1
 lr_track: 0.0001
 overwrite_lrs: false
 overwrite_lr_scheduler: false
-batch_size: 2
+batch_size: 8
 weight_decay: 0.0001
 epochs: 50
 lr_drop: 40
@@ -20,8 +20,8 @@ two_stage: false
 freeze_detr: false
 load_mask_head_from_model: null
 # Backbone
-# Name of the convolutional backbone to use. ('resnet50', 'resnet101')
-backbone: resnet50
+# Name of the convolutional backbone to use. ('resnet50', 'resnet101', 'resnet50_4_channel')
+backbone: resnet50_4_channel
 # If true, we replace stride with dilation in the last convolutional block (DC5)
 dilation: false
 # Type of positional embedding to use on top of the image features. ('sine', 'learned')
@@ -47,9 +47,9 @@ pre_norm: false
 dec_n_points: 4
 enc_n_points: 4
 # Tracking
-tracking: false
+tracking: true
 # In addition to detection also run tracking evaluation with default configuration from `cfgs/track.yaml`
-tracking_eval: true
+tracking_eval: false
 # Range of possible random previous frames
 track_prev_frame_range: 0
 track_prev_frame_rnd_augs: 0.01
@@ -119,7 +119,7 @@ resume_optim: false
 resume_vis: false
 start_epoch: 1
 eval_only: false
-eval_train: false
+eval_train: true
 num_workers: 1
 val_interval: 5
 debug: false
@@ -145,3 +145,5 @@ flir_adas_v2_val_split: val_coco
 
 flir_adas_v2_thermal_train_split: train_coco_t
 flir_adas_v2_thermal_val_split: val_coco_t
+#Homography matrix
+thermal_to_rgb_H: [[8.53574165e-01, 2.22375667e-03, 3.89015344e+01], [9.72721717e-03, 8.07532479e-01, 3.99946901e+01],[2.60277679e-05, 9.73726838e-06, 1.00000000e+00]]

@@ -4,20 +4,85 @@ Tracker which achieves MOT with the provided object detector.
 """
 from collections import deque
 
+from matplotlib import pyplot as plt
 import numpy as np
 import torch
 import torch.nn.functional as F
 from scipy.optimize import linear_sum_assignment
 from torchvision.ops.boxes import clip_boxes_to_image, nms, box_iou
+import visdom
 
 from ..util.box_ops import box_xyxy_to_cxcywh
+from PIL import Image
+from global_visdom import VisdomSingleton
 
+def display_bbox(vis: visdom.Visdom, img, boxes, size, win="image_with_bboxes"):
+    # --- 0. 전처리: [4,H,W]  →  [H,W,3] numpy ---
+    img = img.squeeze(0)
+    img_rgb_norm = img[:3]         # [3,H,W]   (RGB만)
+
+    # -------------------------------------------------
+    # 2) 역‑정규화 (ImageNet mean/std 예시)
+    # -------------------------------------------------
+    mean = torch.tensor([0.485, 0.456, 0.406], device=img_rgb_norm.device)[:, None, None]
+    std  = torch.tensor([0.229, 0.224, 0.225], device=img_rgb_norm.device)[:, None, None]
+
+    img_rgb = (img_rgb_norm * std + mean).clamp(0, 1)   # [3,H,W], 0~1 float
+
+    # -------------------------------------------------
+    # 3) Matplotlib bbox 오버레이
+    # -------------------------------------------------
+    np_img = img_rgb.permute(1, 2, 0).cpu().numpy()     # H,W,3  0~1
+    # 1. Make a 1×2 figure
+    fig, ((ax1, ax2), (ax3, ax4)) = plt.subplots(2, 2, figsize=(18, 18))
+    
+    origin_img = Image.fromarray((np_img * 255).astype('uint8'))
+    origin_img = origin_img.resize(size, resample=Image.BILINEAR)
+    origin_img = np.array(origin_img).astype('float32') / 255.0
+    ax1.imshow(origin_img)
+    ax1.set_title("Origin")
+    ax1.axis('off')
+
+    # Left: your original image + bboxes
+    ax2.imshow(origin_img)
+    for x1, y1, w, h in boxes.cpu():
+        rect = plt.Rectangle((x1, y1), w, h,
+                         linewidth=2, edgecolor='r', facecolor='none')
+        ax2.add_patch(rect)
+    ax2.set_title(win)
+    ax2.axis('off')
+
+    # Right: the threshold (Th) image
+    #   if img is a torch.Tensor, convert to numpy first:
+    th_img = (img[3] * 0.229 + 0.485).cpu().numpy()
+    ax3.imshow(th_img, cmap='gray')
+    ax3.set_title("Th")
+    ax3.axis('off')
+
+    th_img = Image.fromarray((th_img * 255).astype('uint8'))
+    th_img = th_img.resize(size, resample=Image.BILINEAR)
+    th_img = np.array(th_img).astype('float32') / 255.0        
+    for x1, y1, w, h in boxes.cpu():
+        rect = plt.Rectangle((x1, y1), w, h,
+                         linewidth=2, edgecolor='r', facecolor='none')
+        ax4.add_patch(rect)
+    ax4.imshow(th_img, cmap='gray')
+    ax4.set_title(win)
+    ax4.axis('off')
+
+    # 2. Send the combined figure to Visdom
+    vis.matplot(fig, win=win, opts=dict(title=win + " + Th"))
+    
+    # 메모리 누수 방지
+    plt.close(fig)
+    
 
 class Tracker:
     """The main tracking file, here is where magic happens."""
 
     def __init__(self, obj_detector, obj_detector_post, tracker_cfg,
                  generate_attention_maps, logger=None, verbose=False):
+        # 사용할 멤버 변수 선언
         self.obj_detector = obj_detector
         self.obj_detector_post = obj_detector_post
         self.detection_obj_score_thresh = tracker_cfg['detection_obj_score_thresh']
@@ -33,6 +98,7 @@ class Tracker:
         self.reid_greedy_matching = tracker_cfg['reid_greedy_matching']
         self.prev_frame_dist = tracker_cfg['prev_frame_dist']
         self.steps_termination = tracker_cfg['steps_termination']
+        self.visdom = VisdomSingleton.get_instance()
         #print(f"[DEBUG] Tracker initialized: track_num=None, results=None")
 
         if self.generate_attention_maps:
@@ -48,14 +114,15 @@ class Tracker:
             attention_data['hooks'].append(hook)
 
             def add_attention_map_to_data(self, input, output):
-                height, width = attention_data['conv_features']['3'].tensors.shape[-2:]
+                height, width = attention_data['conv_features']['4'].tensors.shape[-2:]
                 attention_maps = output[1].view(-1, height, width)
 
                 attention_data.update({'maps': attention_maps})
 
             multihead_attn = self.obj_detector.transformer.decoder.layers[-1].multihead_attn
             hook = multihead_attn.register_forward_hook(
-                add_attention_map_to_data)
+                add_attention_map_to_data
+            )
             attention_data['hooks'].append(hook)
 
             self.attention_data = attention_data
@@ -318,6 +385,27 @@ class Tracker:
             target = [target]
 
         outputs, _, features, _, _ = self.obj_detector(img, target, self._prev_features[0])
+        
+        out_logits, out_bbox = outputs['pred_logits'], outputs['pred_boxes']
+        probs = torch.sigmoid(out_logits.squeeze(0))
+        confidences, _ = probs.max(dim=-1)  
+        threshold = 0.5
+        mask = confidences > threshold
+        
+        boxes_cxcywh = out_bbox.squeeze(0)[mask]
+
+        H, W = orig_size.squeeze(0)
+        scale = torch.tensor([W, H, W, H], device=boxes_cxcywh.device)
+        boxes_cxcywh = boxes_cxcywh * scale        # new Tensor 반환(원본 보존)
+
+        # boxes: Tensor[N, 4]  (cx, cy, w, h)
+        # (cx, cy, w, h) → (x1, y1, w, h) 
+        boxes_x1y1wh = torch.cat(
+            [boxes_cxcywh[:, :2] - boxes_cxcywh[:, 2:] / 2,   # x1, y1
+            boxes_cxcywh[:, 2:]],                            # w,  h
+            dim=1
+        )
+        display_bbox(self.visdom, img, boxes_x1y1wh, (W, H))
 
         hs_embeds = outputs['hs_embed'][0]
 
@@ -330,6 +418,17 @@ class Tracker:
                 blob["size"].to(self.device),
                 return_probs=True)
         result = results[0]
+        
+        boxes = result['boxes'][result['scores'] > threshold]
+        boxes_x1y1wh = torch.cat(
+            [
+                boxes[:, :2],                              # x1, y1
+                boxes[:, 2:] - boxes[:, :2]      # w = x2-x1, h = y2-y1
+            ],
+            dim=1
+        )
+        display_bbox(self.visdom, img, boxes_x1y1wh, (W, H), "obj_detector_post")
+        
 
         if 'masks' in result:
             result['masks'] = result['masks'].squeeze(dim=1)
@@ -557,7 +656,7 @@ class Tracker:
             if track.attention_map is not None:
                 self.results[track.id][self.frame_index]['attention_map'] = \
                     track.attention_map.cpu().numpy()
-            print(f"[DEBUG] Updated results for track_id={track.id}: {self.results[track.id][self.frame_index]}")
+            #print(f"[DEBUG] Updated results for track_id={track.id}: {self.results[track.id][self.frame_index]}")
 
         for t in self.inactive_tracks:
             t.count_inactive += 1
@@ -570,9 +669,9 @@ class Tracker:
 
     def get_results(self):
         """Return current tracking results."""
-        print(f"[DEBUG] get_results called: {len(self.results)} tracks")
-        for track_id, frames in self.results.items():
-            print(f"[DEBUG] Track ID={track_id}, Frames={len(frames)}")
+        #print(f"[DEBUG] get_results called: {len(self.results)} tracks")
+        #for track_id, frames in self.results.items():
+        #    print(f"[DEBUG] Track ID={track_id}, Frames={len(frames)}")
 
         return self.results
 

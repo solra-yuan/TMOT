@@ -1,10 +1,6 @@
 name: Sonar cloud
 
 on:
-  push:
-    branches: [ main, thermal-rgb ]
-  pull_request:
-    branches: [ main, thermal-rgb ]
   workflow_dispatch:
 
 jobs:
@@ -40,4 +36,4 @@ jobs:
             -Dsonar.sources=./src
             -Dsonar.host.url=https://sonarcloud.io
             -Dsonar.login=${{ secrets.SONAR_TOKEN }}
-            -Dsonar.python.coverage.reportPaths=${{ github.workspace }}/coverage.xml
+            -Dsonar.python.coverage.reportPaths=coverage.xml
